@@ -1,0 +1,21 @@
+{
+  "realm": "tabibi",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      { "name": "PATIENT" },
+      { "name": "MEDECIN" },
+      { "name": "SECRETAIRE" },
+      { "name": "ADMIN" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "tabibi-web",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "redirectUris": ["http://localhost:4200/*"],
+      "webOrigins": ["http://localhost:4200"]
+    }
+  ]
+}

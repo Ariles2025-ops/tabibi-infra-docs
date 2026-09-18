@@ -1,0 +1,595 @@
+<title>Tabibi — Architecture Cible</title>
+<meta name="description" content="Étude et architecture de la plateforme Tabibi v2 : back-end Spring Boot, front Angular, mobile Flutter, sécurité Keycloak/JWT, base PostgreSQL portable.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<style>
+:root{
+  --paper:#F6F9F8; --panel:#FFFFFF; --panel-2:#EEF4F2; --line:#DDE7E3;
+  --ink:#10241F; --muted:#566B64; --faint:#8AA099;
+  --green:#0F7560; --green-2:#0B5C4B; --green-soft:#E6F1ED;
+  --gold:#C6922B; --gold-soft:#F6ECD6;
+  --danger:#B23A34; --danger-soft:#F6E3E1;
+  --code-bg:#0E1B18; --code-ink:#DCEAE5;
+  --shadow:0 1px 2px rgba(16,36,31,.05), 0 8px 24px rgba(16,36,31,.06);
+  --diagram-bg:#FBFDFC;
+  --sans:"Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --display:"Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --maxw:920px;
+}
+:root:not([data-theme="light"]){ @media (prefers-color-scheme: dark){
+  --paper:#0C1513; --panel:#12201C; --panel-2:#16241F; --line:#24352F;
+  --ink:#E7F0EC; --muted:#9CB2AB; --faint:#6E877F;
+  --green:#37B394; --green-2:#57C7A9; --green-soft:#12312A;
+  --gold:#E3B657; --gold-soft:#33290F;
+  --danger:#E8756D; --danger-soft:#3A211F;
+  --code-bg:#0A130F; --code-ink:#CFE2DB;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  --diagram-bg:#F4F8F6;
+}}
+:root[data-theme="dark"]{
+  --paper:#0C1513; --panel:#12201C; --panel-2:#16241F; --line:#24352F;
+  --ink:#E7F0EC; --muted:#9CB2AB; --faint:#6E877F;
+  --green:#37B394; --green-2:#57C7A9; --green-soft:#12312A;
+  --gold:#E3B657; --gold-soft:#33290F;
+  --danger:#E8756D; --danger-soft:#3A211F;
+  --code-bg:#0A130F; --code-ink:#CFE2DB;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  --diagram-bg:#F4F8F6;
+}
+*{box-sizing:border-box}
+body{background:var(--paper); color:var(--ink); font-family:var(--sans); line-height:1.6; margin:0; -webkit-font-smoothing:antialiased}
+.wrap{max-width:var(--maxw); margin:0 auto; padding-inline:20px; padding-block:0}
+
+/* Top bar */
+.topbar{position:sticky; top:env(safe-area-inset-top,0px); z-index:20; background:color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter:blur(10px); border-bottom:1px solid var(--line)}
+.topbar .row{max-width:var(--maxw); margin:0 auto; padding:10px 20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap}
+.brand{display:flex; align-items:center; gap:10px; font-family:var(--display); font-weight:800; letter-spacing:-.02em}
+.brand .mark{width:26px; height:26px; border-radius:7px; background:linear-gradient(135deg,var(--green),var(--green-2)); display:grid; place-items:center; color:#fff; font-weight:800; font-size:15px; box-shadow:var(--shadow)}
+.brand small{font-family:var(--mono); font-weight:500; color:var(--muted); font-size:11px; letter-spacing:0}
+nav.toc{display:flex; gap:2px; flex-wrap:wrap; margin-left:auto}
+nav.toc a{font-family:var(--mono); font-size:11.5px; color:var(--muted); text-decoration:none; padding:4px 8px; border-radius:6px; white-space:nowrap}
+nav.toc a:hover{color:var(--ink); background:var(--panel-2)}
+
+/* Hero */
+.hero{padding-block:44px 20px}
+.eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--green); font-weight:600}
+h1{font-family:var(--display); font-weight:800; letter-spacing:-.03em; font-size:clamp(30px,6vw,50px); line-height:1.04; margin:.35em 0 .3em; text-wrap:balance}
+.lede{font-size:clamp(16px,2.4vw,19px); color:var(--muted); max-width:60ch}
+.meta{display:flex; gap:8px; flex-wrap:wrap; margin-top:20px}
+.chip{font-family:var(--mono); font-size:11.5px; padding:5px 10px; border-radius:999px; background:var(--panel); border:1px solid var(--line); color:var(--muted)}
+.chip b{color:var(--ink); font-weight:600}
+
+/* Sections */
+section{padding-block:22px; scroll-margin-top:70px}
+.kicker{font-family:var(--mono); font-size:12px; color:var(--gold); font-weight:600; letter-spacing:.06em}
+h2{font-family:var(--display); font-weight:800; letter-spacing:-.02em; font-size:clamp(22px,3.6vw,30px); margin:.15em 0 .5em; text-wrap:balance}
+h3{font-family:var(--display); font-weight:700; font-size:18px; margin:1.4em 0 .4em; letter-spacing:-.01em}
+p{margin:.5em 0} p+p{margin-top:.7em}
+a{color:var(--green); text-underline-offset:2px}
+.divider{height:1px; background:var(--line); border:0; margin:0}
+
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow)}
+.grid{display:grid; gap:14px}
+@media(min-width:640px){ .grid.cols-2{grid-template-columns:1fr 1fr} .grid.cols-3{grid-template-columns:repeat(3,1fr)} }
+
+/* principle cards */
+.principle{display:flex; gap:12px; align-items:flex-start}
+.principle .ic{flex:0 0 34px; width:34px; height:34px; border-radius:9px; background:var(--green-soft); color:var(--green); display:grid; place-items:center}
+.principle h3{margin:.1em 0 .2em; font-size:16px}
+.principle p{margin:0; font-size:14px; color:var(--muted)}
+
+/* table */
+.tablewrap{overflow-x:auto; border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow)}
+table{width:100%; border-collapse:collapse; font-size:14px; min-width:560px; background:var(--panel)}
+th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+thead th{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); background:var(--panel-2)}
+tbody tr:last-child td{border-bottom:0}
+td b{font-weight:600}
+.pill{display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 7px; border-radius:6px; background:var(--green-soft); color:var(--green); font-weight:600}
+.pill.gold{background:var(--gold-soft); color:var(--gold)}
+
+/* figure / diagram */
+figure{margin:18px 0}
+.diagram{background:var(--diagram-bg); border:1px solid var(--line); border-radius:14px; padding:16px; overflow-x:auto; box-shadow:var(--shadow)}
+.diagram pre.mermaid{margin:0; background:transparent; text-align:center; min-width:520px}
+figcaption{font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:8px; padding-left:2px}
+figcaption b{color:var(--ink)}
+
+/* code */
+pre.code{background:var(--code-bg); color:var(--code-ink); border-radius:12px; padding:14px 16px; overflow-x:auto; font-family:var(--mono); font-size:12.5px; line-height:1.55; margin:12px 0}
+code{font-family:var(--mono); font-size:.9em; background:var(--panel-2); padding:1px 6px; border-radius:5px; color:var(--ink)}
+pre.code code{background:none; padding:0}
+
+/* lists */
+ul.clean{list-style:none; padding:0; margin:.4em 0}
+ul.clean li{position:relative; padding-left:22px; margin:.35em 0; color:var(--ink)}
+ul.clean li::before{content:""; position:absolute; left:4px; top:.62em; width:7px; height:7px; border-radius:2px; background:var(--green); transform:rotate(45deg)}
+ul.clean li b{font-weight:600}
+
+/* roadmap */
+.phase{display:flex; gap:14px; align-items:flex-start; padding:14px 0; border-bottom:1px dashed var(--line)}
+.phase:last-child{border-bottom:0}
+.phase .num{flex:0 0 auto; font-family:var(--mono); font-weight:600; font-size:12px; color:var(--green); background:var(--green-soft); border-radius:8px; padding:6px 9px; min-width:44px; text-align:center}
+.phase h3{margin:.05em 0 .2em; font-size:16px}
+.phase p{margin:0; font-size:14px; color:var(--muted)}
+.phase .out{font-family:var(--mono); font-size:11.5px; color:var(--gold); margin-top:5px}
+
+/* callout */
+.note{border-left:3px solid var(--gold); background:var(--gold-soft); border-radius:0 12px 12px 0; padding:12px 16px; font-size:14px}
+.note b{color:var(--ink)}
+
+footer{padding:34px 20px 46px; text-align:center; color:var(--faint); font-family:var(--mono); font-size:11.5px; border-top:1px solid var(--line); margin-top:26px}
+
+@media (prefers-reduced-motion:no-preference){ nav.toc a{transition:background .15s, color .15s} }
+</style>
+
+<div class="topbar">
+  <div class="row">
+    <div class="brand"><span class="mark">T</span> Tabibi <small>architecture · v2</small></div>
+    <nav class="toc">
+      <a href="#principes">Principes</a>
+      <a href="#stack">Stack</a>
+      <a href="#contexte">Contexte</a>
+      <a href="#backend">Back-end</a>
+      <a href="#securite">Sécurité</a>
+      <a href="#donnees">Données</a>
+      <a href="#classes">Classes</a>
+      <a href="#git">Git</a>
+      <a href="#tests">Tests</a>
+      <a href="#deploiement">Déploiement</a>
+      <a href="#feuille">Feuille de route</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">Étude &amp; architecture cible</div>
+    <h1>La plateforme Tabibi, reconstruite pour durer</h1>
+    <p class="lede">Une base technique professionnelle pour une application de santé : sécurité d'abord, testée de bout en bout, portable, et assez claire pour qu'une équipe recrutée la comprenne en une lecture.</p>
+    <div class="meta">
+      <span class="chip"><b>Back</b> Spring Boot 3.4 · Java 21</span>
+      <span class="chip"><b>Web</b> Angular 18 + SSR</span>
+      <span class="chip"><b>Mobile</b> Flutter (iOS + Android)</span>
+      <span class="chip"><b>Base</b> PostgreSQL 16 · Liquibase</span>
+      <span class="chip"><b>Identité</b> Keycloak · OAuth2/JWT</span>
+    </div>
+  </header>
+
+  <hr class="divider">
+
+  <!-- PRINCIPES -->
+  <section id="principes">
+    <div class="kicker">01 — Fondations</div>
+    <h2>Cinq principes qui décident de tout</h2>
+    <p>Chaque choix technique de ce document découle de ces cinq engagements. Ils sont l'étalon : une décision qui les sert est bonne, une décision qui les contredit est rejetée.</p>
+    <div class="grid cols-2" style="margin-top:14px">
+      <div class="card principle">
+        <div class="ic">🔒</div>
+        <div><h3>Sécurité d'abord</h3><p>On manipule des données patients. Authentification déléguée à Keycloak (OAuth2/OIDC), autorisation par rôle avec Spring Security, JWT signés, chiffrement en transit et au repos, journal d'audit. La sécurité est la première fonctionnalité construite, pas la dernière.</p></div>
+      </div>
+      <div class="card principle">
+        <div class="ic">↔</div>
+        <div><h3>Portabilité</h3><p>Le métier ne connaît ni la base, ni le web, ni le fournisseur d'hébergement. JPA + Liquibase rendent PostgreSQL remplaçable ; les conteneurs Docker rendent l'hébergeur remplaçable. On démarre pas cher, on grandit sans réécrire.</p></div>
+      </div>
+      <div class="card principle">
+        <div class="ic">✓</div>
+        <div><h3>Testabilité</h3><p>Chaque fonctionnalité arrive avec ses tests : unitaires (JUnit + Mockito), d'intégration sur une vraie base (Testcontainers), et de bout en bout. Un commit = une fonctionnalité + ses tests, pour tracer et revenir en arrière sans risque.</p></div>
+      </div>
+      <div class="card principle">
+        <div class="ic">◇</div>
+        <div><h3>Clarté</h3><p>Architecture hexagonale, découpage par domaine, nommage explicite, documentation vivante avec diagrammes. Un développeur recruté doit comprendre l'application et son architecture sans qu'on la lui explique.</p></div>
+      </div>
+      <div class="card principle" style="grid-column:1/-1">
+        <div class="ic">⟳</div>
+        <div><h3>Progressivité</h3><p>On avance fonctionnalité par fonctionnalité, doucement, chacune livrée, testée et documentée. L'application actuelle continue de tourner et d'assurer le lancement de décembre pendant que la nouvelle plateforme se construit à côté.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- STACK -->
+  <section id="stack">
+    <div class="kicker">02 — Technologies</div>
+    <h2>La stack retenue, et pourquoi</h2>
+    <p>Des technologies éprouvées, largement adoptées, avec un grand vivier de développeurs et un support long terme — le contraire d'un pari.</p>
+    <div class="tablewrap" style="margin-top:14px">
+      <table>
+        <thead><tr><th>Couche</th><th>Choix</th><th>Version</th><th>Pourquoi ce choix</th></tr></thead>
+        <tbody>
+          <tr><td><b>Langage back</b></td><td>Java <span class="pill">LTS</span></td><td>21</td><td>Support long terme, écosystème mûr, typage fort — adapté à un domaine sensible et à une équipe.</td></tr>
+          <tr><td><b>Framework back</b></td><td>Spring Boot</td><td>3.4</td><td>Standard de l'industrie pour les API métier ; sécurité, données, tests intégrés.</td></tr>
+          <tr><td><b>Sécurité</b></td><td>Spring Security + Keycloak</td><td>6.x / 26</td><td>Identité déléguée (OAuth2/OIDC), JWT, MFA, rôles — auditable et standard pour la santé.</td></tr>
+          <tr><td><b>Accès données</b></td><td>Spring Data JPA / Hibernate</td><td>6.x</td><td>Abstraction de la base : changer de moteur ne réécrit pas le métier.</td></tr>
+          <tr><td><b>Migrations</b></td><td>Liquibase</td><td>4.x</td><td>Schéma versionné, revue en PR, retour arrière — jamais de changement de base « à la main ».</td></tr>
+          <tr><td><b>Base</b></td><td>PostgreSQL</td><td>16</td><td>Relationnel robuste pour le dossier médical, JSONB au besoin, gratuit, mûr.</td></tr>
+          <tr><td><b>Front web</b></td><td>Angular + Universal (SSR)</td><td>18</td><td>Très structuré (router, formulaires, i18n, DI intégrés) : onboarding rapide, cohérence d'équipe, SEO couvert par le SSR.</td></tr>
+          <tr><td><b>Mobile</b></td><td>Flutter <span class="pill gold">iOS + Android</span></td><td>3.x</td><td>Un seul code pour les deux plateformes, perfs quasi-natives, une seule équipe.</td></tr>
+          <tr><td><b>Build back</b></td><td>Maven</td><td>3.9</td><td>Convention claire, familier des équipes Spring, CI simple.</td></tr>
+          <tr><td><b>API doc</b></td><td>springdoc / OpenAPI</td><td>2.x</td><td>Contrat d'API généré et navigable (Swagger UI) — le front et le mobile s'alignent dessus.</td></tr>
+          <tr><td><b>Conteneurs</b></td><td>Docker + Compose</td><td>—</td><td>Même image en dev, test et prod ; hébergeur interchangeable.</td></tr>
+          <tr><td><b>CI/CD</b></td><td>GitHub Actions</td><td>—</td><td>Tests + build à chaque PR, déploiement automatisé, gratuit pour l'organisation.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px"><span class="pill gold">Note</span> &nbsp;<i>Next.js</i> et <i>React nu</i> ont été écartés : Next mélange front et back (ses API routes) alors qu'on veut un back Spring séparé et propre ; React nu laisse toute l'architecture à la discipline d'équipe. Angular impose une structure — précisément ce qu'il faut pour recruter et faire comprendre l'application.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- CONTEXTE -->
+  <section id="contexte">
+    <div class="kicker">03 — Vue d'ensemble</div>
+    <h2>Qui parle à quoi</h2>
+    <p>Trois clients (web, mobile, et le back-office admin) parlent à <b>une seule API</b>. L'API délègue l'identité à Keycloak, persiste dans PostgreSQL, et confie les envois (SMS, e-mail, PDF, vidéo) à des services externes derrière des <i>adaptateurs</i> remplaçables.</p>
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F1ED','primaryBorderColor':'#0F7560','primaryTextColor':'#10241F','secondaryColor':'#F6ECD6','secondaryBorderColor':'#C6922B','tertiaryColor':'#EEF4F2','lineColor':'#566B64','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart TB
+  subgraph Clients
+    W["Web Angular<br/>(patient · médecin · cabinet)"]
+    M["Mobile Flutter<br/>(iOS + Android)"]
+    A["Back-office Admin"]
+  end
+  KC(["Keycloak<br/>OAuth2 · OIDC · MFA"])
+  API["API Tabibi<br/>Spring Boot · REST"]
+  DB[("PostgreSQL 16")]
+  subgraph Services externes
+    SMS["SMS / OTP"]
+    WA["WhatsApp"]
+    MAIL["E-mail"]
+    PDF["Ordonnances PDF"]
+    VID["Téléconsultation vidéo"]
+  end
+  W & M & A -->|"1 · login"| KC
+  KC -->|"JWT signé"| W & M & A
+  W & M & A -->|"2 · appels REST + JWT"| API
+  API -->|"valide le JWT"| KC
+  API -->|"JPA"| DB
+  API --> SMS & WA & MAIL & PDF & VID
+</pre>
+      </div>
+      <figcaption><b>Contexte système.</b> Un seul point d'entrée API. L'identité est centralisée dans Keycloak ; les services externes sont isolés derrière des adaptateurs.</figcaption>
+    </figure>
+  </section>
+
+  <hr class="divider">
+
+  <!-- BACKEND -->
+  <section id="backend">
+    <div class="kicker">04 — Back-end</div>
+    <h2>Architecture hexagonale</h2>
+    <p>Le cœur — les règles métier — est au centre et <b>ne dépend de rien</b>. Autour, des <i>ports</i> (interfaces) définissent ce dont le métier a besoin ; des <i>adaptateurs</i> les branchent au monde réel (web, base, services). Conséquence directe : on remplace PostgreSQL, un fournisseur SMS ou même le framework web sans toucher au métier — et on teste le métier sans base ni réseau.</p>
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F1ED','primaryBorderColor':'#0F7560','primaryTextColor':'#10241F','secondaryColor':'#F6ECD6','secondaryBorderColor':'#C6922B','tertiaryColor':'#EEF4F2','lineColor':'#566B64','fontFamily':'IBM Plex Mono, monospace','fontSize':'13px'}}}%%
+flowchart LR
+  subgraph IN["Adaptateurs entrants"]
+    REST["Contrôleurs REST<br/>+ Spring Security"]
+  end
+  subgraph CORE["Cœur métier (domaine)"]
+    direction TB
+    UC["Cas d'usage<br/>(services applicatifs)"]
+    DOM["Entités &amp; règles<br/>RendezVous · Ordonnance · Créneau"]
+    PORTS["Ports (interfaces)"]
+    UC --> DOM
+    UC --> PORTS
+  end
+  subgraph OUT["Adaptateurs sortants"]
+    JPA["Repository JPA<br/>→ PostgreSQL"]
+    NOTIF["Notifieur<br/>→ SMS / e-mail"]
+    IDP["Identité<br/>→ Keycloak"]
+  end
+  REST --> UC
+  PORTS --> JPA & NOTIF & IDP
+</pre>
+      </div>
+      <figcaption><b>Le métier au centre.</b> Les flèches pointent vers le cœur : rien au centre ne connaît la technologie autour. Chaque adaptateur est remplaçable et testable isolément.</figcaption>
+    </figure>
+    <h3>Découpage par domaine</h3>
+    <p>Le back-end est organisé en modules métier autonomes, pas en couches techniques fourre-tout :</p>
+    <ul class="clean">
+      <li><b>identite</b> — comptes, rôles, profils (s'appuie sur Keycloak).</li>
+      <li><b>annuaire</b> — médecins, cabinets, spécialités, wilayas, recherche.</li>
+      <li><b>rendezvous</b> — créneaux, réservation, agenda, statuts, listes d'attente.</li>
+      <li><b>ordonnances</b> — création, consultation, PDF vérifiable.</li>
+      <li><b>teleconsultation</b> — sessions vidéo, consentement.</li>
+      <li><b>dawini</b> — demandes de médicaments, réponses des pharmacies.</li>
+      <li><b>messagerie</b> &amp; <b>notifications</b> — échanges, rappels SMS/e-mail.</li>
+      <li><b>administration</b> — validation des médecins, modération, clés API.</li>
+    </ul>
+  </section>
+
+  <hr class="divider">
+
+  <!-- SECURITE -->
+  <section id="securite">
+    <div class="kicker">05 — Sécurité</div>
+    <h2>Identité, jetons et autorisations</h2>
+    <p>Aucun mot de passe ne transite ni n'est stocké par notre API : <b>Keycloak</b> gère l'authentification (mot de passe, OTP SMS, MFA), et remet un <b>JWT signé</b>. Chaque appel à l'API porte ce jeton ; Spring Security le valide et applique les droits selon le rôle. Ni le web, ni le mobile ne voient jamais un secret durable.</p>
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F1ED','primaryBorderColor':'#0F7560','primaryTextColor':'#10241F','actorBkg':'#E6F1ED','actorBorder':'#0F7560','signalColor':'#566B64','signalTextColor':'#10241F','labelBoxBkgColor':'#F6ECD6','labelBoxBorderColor':'#C6922B','noteBkgColor':'#F6ECD6','noteBorderColor':'#C6922B','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px'}}}%%
+sequenceDiagram
+  autonumber
+  participant U as Client (web/mobile)
+  participant K as Keycloak
+  participant A as API Spring Boot
+  participant D as PostgreSQL
+  U->>K: Identifiants (+ OTP / MFA)
+  K-->>U: JWT signé (rôle, expiration)
+  U->>A: GET /rendezvous + Bearer JWT
+  A->>K: Clés publiques (JWKS)
+  A->>A: Vérifie signature + rôle
+  alt Autorisé
+    A->>D: Lecture filtrée par identité
+    D-->>A: Données
+    A-->>U: 200 OK
+  else Non autorisé
+    A-->>U: 403 Refusé
+  end
+</pre>
+      </div>
+      <figcaption><b>Flux d'authentification.</b> Le jeton est vérifié à chaque requête via les clés publiques de Keycloak. L'autorisation se joue côté API, jamais côté client.</figcaption>
+    </figure>
+    <div class="note" style="margin-top:4px"><b>Défense en profondeur.</b> TLS partout · chiffrement au repos (base + stockage) · secrets hors du code (variables d'environnement / coffre) · journal d'audit des accès aux données sensibles · principe du moindre privilège · limitation de débit et captcha sur les points publics.</div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- DONNEES -->
+  <section id="donnees">
+    <div class="kicker">06 — Modèle de données</div>
+    <h2>Un schéma pensé pour durer</h2>
+    <p>Le modèle relationnel garantit l'intégrité du dossier médical. Il est décrit en Liquibase, versionné, et reste indépendant du moteur. Voici le noyau (extrait — les modules périphériques ajoutent leurs tables) :</p>
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F1ED','primaryBorderColor':'#0F7560','primaryTextColor':'#10241F','lineColor':'#566B64','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px'}}}%%
+erDiagram
+  UTILISATEUR ||--o| PATIENT : "est"
+  UTILISATEUR ||--o| MEDECIN : "est"
+  CABINET ||--o{ MEDECIN : "emploie"
+  MEDECIN ||--o{ CRENEAU : "ouvre"
+  MEDECIN ||--o{ RENDEZVOUS : "reçoit"
+  PATIENT ||--o{ RENDEZVOUS : "prend"
+  RENDEZVOUS ||--o| ORDONNANCE : "produit"
+  MEDECIN ||--o{ ORDONNANCE : "rédige"
+  MEDECIN ||--o{ AVIS : "reçoit"
+  PATIENT ||--o{ AVIS : "publie"
+  PATIENT ||--o{ DEMANDE_DAWINI : "publie"
+  PHARMACIE ||--o{ REPONSE_DAWINI : "répond"
+  DEMANDE_DAWINI ||--o{ REPONSE_DAWINI : "reçoit"
+  UTILISATEUR {
+    uuid id PK
+    string keycloak_id
+    string role
+    timestamp cree_le
+  }
+  RENDEZVOUS {
+    uuid id PK
+    uuid patient_id FK
+    uuid medecin_id FK
+    timestamp debut
+    string statut
+    string mode_paiement
+  }
+  ORDONNANCE {
+    uuid id PK
+    uuid rendezvous_id FK
+    string statut
+    timestamp emise_le
+  }
+</pre>
+      </div>
+      <figcaption><b>Noyau du modèle.</b> Clés étrangères explicites, identifiants UUID, statuts typés. Toute évolution passe par une migration Liquibase revue en PR.</figcaption>
+    </figure>
+  </section>
+
+  <hr class="divider">
+
+  <!-- CLASSES -->
+  <section id="classes">
+    <div class="kicker">07 — Domaine</div>
+    <h2>Diagramme de classes</h2>
+    <p>Les entités métier et leurs responsabilités, telles qu'un développeur les retrouvera dans le module <code>rendezvous</code> et ses voisins.</p>
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F1ED','primaryBorderColor':'#0F7560','primaryTextColor':'#10241F','lineColor':'#566B64','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px'}}}%%
+classDiagram
+  class Utilisateur{
+    +UUID id
+    +String keycloakId
+    +Role role
+  }
+  class Patient{
+    +String nom
+    +String telephone
+    +prendreRendezVous()
+  }
+  class Medecin{
+    +String nomComplet
+    +Specialite specialite
+    +Wilaya wilaya
+    +ouvrirCreneau()
+    +redigerOrdonnance()
+  }
+  class Cabinet{
+    +String nom
+    +List~Medecin~ medecins
+  }
+  class RendezVous{
+    +UUID id
+    +Instant debut
+    +StatutRdv statut
+    +ModePaiement paiement
+    +confirmer()
+    +annuler()
+  }
+  class Ordonnance{
+    +UUID id
+    +StatutOrdonnance statut
+    +genererPdf()
+  }
+  class Creneau{
+    +Instant debut
+    +boolean disponible
+  }
+  Utilisateur <|-- Patient
+  Utilisateur <|-- Medecin
+  Cabinet "1" o-- "*" Medecin
+  Medecin "1" --> "*" Creneau
+  Patient "1" --> "*" RendezVous
+  Medecin "1" --> "*" RendezVous
+  RendezVous "1" --> "0..1" Ordonnance
+</pre>
+      </div>
+      <figcaption><b>Modèle du domaine.</b> <code>Patient</code> et <code>Medecin</code> spécialisent <code>Utilisateur</code> ; le comportement (confirmer, annuler, générer) vit dans les entités, pas dispersé.</figcaption>
+    </figure>
+    <h3>Parcours clé — réserver un rendez-vous</h3>
+    <figure>
+      <div class="diagram">
+<pre class="mermaid">
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#E6F1ED','primaryBorderColor':'#0F7560','primaryTextColor':'#10241F','actorBkg':'#E6F1ED','actorBorder':'#0F7560','signalColor':'#566B64','signalTextColor':'#10241F','noteBkgColor':'#F6ECD6','noteBorderColor':'#C6922B','fontFamily':'IBM Plex Mono, monospace','fontSize':'12px'}}}%%
+sequenceDiagram
+  autonumber
+  participant P as Patient
+  participant API as API (cas d'usage)
+  participant R as Repository (JPA)
+  participant N as Notifieur
+  P->>API: POST /rendezvous (médecin, créneau)
+  API->>R: Créneau encore libre ?
+  R-->>API: Oui
+  API->>API: Créer RendezVous (statut = CONFIRMÉ)
+  API->>R: Enregistrer (transaction)
+  API->>N: Envoyer confirmation (SMS + e-mail)
+  API-->>P: 201 Créé
+</pre>
+      </div>
+      <figcaption><b>Séquence de réservation.</b> La règle « le créneau doit être libre » est vérifiée dans le cas d'usage, en transaction — pas dans le client.</figcaption>
+    </figure>
+  </section>
+
+  <hr class="divider">
+
+  <!-- GIT -->
+  <section id="git">
+    <div class="kicker">08 — Organisation Git</div>
+    <h2>Une organisation, des dépôts clairs</h2>
+    <p>Une organisation GitHub <b>Tabibi</b> (logo + branche <code>main</code> protégée), et un dépôt par brique — comme demandé. Chaque dépôt a sa propre CI et ses tests.</p>
+    <div class="grid cols-2" style="margin-top:12px">
+      <div class="card"><h3 style="margin-top:0">Dépôts</h3><ul class="clean" style="margin:0">
+        <li><code>tabibi-backend</code> — API Spring Boot</li>
+        <li><code>tabibi-web</code> — front Angular</li>
+        <li><code>tabibi-mobile</code> — application Flutter</li>
+        <li><code>tabibi-infra-docs</code> — Docker, déploiement, <b>documentation vivante</b> (ce document + diagrammes)</li>
+      </ul></div>
+      <div class="card"><h3 style="margin-top:0">Règles de la branche <code>main</code></h3><ul class="clean" style="margin:0">
+        <li>Pas de push direct — tout passe par une Pull Request.</li>
+        <li>CI verte obligatoire (tests + build) avant fusion.</li>
+        <li>Revue requise ; historique linéaire (squash).</li>
+        <li><b>Un commit par fonctionnalité, avec ses tests</b> — pour tracer et revenir en arrière.</li>
+      </ul></div>
+    </div>
+    <p style="margin-top:14px">Convention de commits (traçable, lisible) :</p>
+    <pre class="code"><code>feat(rendezvous): réservation d'un créneau + garde "créneau libre"
+                  ├─ tests unitaires (cas d'usage)
+                  └─ test d'intégration (Testcontainers + PostgreSQL)
+
+fix(securite):    refuser un JWT expiré sur /ordonnances
+docs(archi):      diagramme de séquence de la réservation</code></pre>
+  </section>
+
+  <hr class="divider">
+
+  <!-- TESTS -->
+  <section id="tests">
+    <div class="kicker">09 — Qualité</div>
+    <h2>Testé à chaque niveau</h2>
+    <p>La règle est simple : <b>aucune fonctionnalité sans ses tests</b>, dans le même commit. On suit la pyramide — beaucoup de tests rapides, peu de tests lents.</p>
+    <div class="tablewrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th>Niveau</th><th>Outils</th><th>Ce qu'il garantit</th></tr></thead>
+        <tbody>
+          <tr><td><b>Unitaire</b></td><td>JUnit 5 · Mockito</td><td>Chaque règle métier isolée, sans base ni réseau — rapide, nombreux.</td></tr>
+          <tr><td><b>Intégration</b></td><td>Spring Boot Test · Testcontainers</td><td>Le module contre un <b>vrai PostgreSQL</b> jetable — les requêtes et migrations Liquibase fonctionnent réellement.</td></tr>
+          <tr><td><b>API</b></td><td>REST Assured · MockMvc</td><td>Les endpoints, la sécurité et les codes de retour, contrat OpenAPI respecté.</td></tr>
+          <tr><td><b>Front / Mobile</b></td><td>Jasmine/Karma · Flutter test</td><td>Composants, formulaires, logique d'écran.</td></tr>
+          <tr><td><b>Bout en bout</b></td><td>Playwright · integration_test</td><td>Les parcours réels (réserver, se connecter) à travers les trois couches.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- DEPLOIEMENT -->
+  <section id="deploiement">
+    <div class="kicker">10 — Déploiement</div>
+    <h2>Démarrer petit, grandir sans réécrire</h2>
+    <p>Tout est conteneurisé (Docker) et « 12-factor » : configuration hors du code, sans état, prêt à changer d'hébergeur. On commence sur un serveur simple et abordable, on migre vers du managé quand le trafic le justifie — <b>sans toucher au code</b>.</p>
+    <div class="grid cols-2" style="margin-top:12px">
+      <div class="card">
+        <h3 style="margin-top:0"><span class="pill">Étape 1</span> Économique</h3>
+        <p style="color:var(--muted); font-size:14px; margin:0">Un VPS en <b>UE / Francfort</b> (Hetzner, OVH…) : Docker Compose lançant PostgreSQL + Keycloak + l'API + un reverse proxy (Caddy/Nginx, HTTPS auto). Le web et le mobile pointent sur le même domaine d'API. Coût faible, tout maîtrisé.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0"><span class="pill gold">Étape 2</span> Managé &amp; scalable</h3>
+        <p style="color:var(--muted); font-size:14px; margin:0">Base managée (PostgreSQL managé), API sur un service de conteneurs ou Kubernetes, Keycloak managé, stockage objet. Comme l'app est conteneurisée et portable, la bascule est une affaire de configuration, pas de réécriture.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px"><span class="pill">Résidence des données</span> Hébergement <b>UE (Francfort)</b> — cohérent avec le choix actuel, bon pour la latence depuis l'Algérie et pour la conformité des données de santé.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- FEUILLE DE ROUTE -->
+  <section id="feuille">
+    <div class="kicker">11 — Feuille de route</div>
+    <h2>On avance par étapes</h2>
+    <p>Chaque phase se termine par du code fusionné, testé et documenté. On ne passe à la suivante qu'une fois la précédente verte.</p>
+    <div class="card" style="margin-top:12px">
+      <div class="phase"><div class="num">0</div><div><h3>Étude &amp; fondations</h3><p>Ce document, l'organisation GitHub, les 4 dépôts, la branche protégée, la CI vide qui tourne. Le squelette Docker Compose (PostgreSQL + Keycloak) qui démarre en local.</p><div class="out">Livrable : architecture validée · dépôts &amp; CI en place</div></div></div>
+      <div class="phase"><div class="num">1</div><div><h3>Socle sécurité</h3><p>Keycloak configuré (rôles patient/médecin/secrétaire/admin), API Spring Boot qui valide le JWT, un premier endpoint protégé, Liquibase branché. Tests de sécurité de bout en bout.</p><div class="out">Livrable : « se connecter » fonctionne des 3 côtés, testé</div></div></div>
+      <div class="phase"><div class="num">2</div><div><h3>Annuaire &amp; recherche</h3><p>Médecins, spécialités, wilayas ; recherche et fiche publique (web SSR pour le SEO). Import des données existantes.</p><div class="out">Livrable : trouver un médecin, web + mobile</div></div></div>
+      <div class="phase"><div class="num">3</div><div><h3>Rendez-vous</h3><p>Créneaux, réservation, agenda, statuts, listes d'attente, rappels. Le cœur du produit.</p><div class="out">Livrable : réserver &amp; gérer un RDV</div></div></div>
+      <div class="phase"><div class="num">4</div><div><h3>Ordonnances &amp; téléconsultation</h3><p>Rédaction et consultation d'ordonnances, PDF vérifiable ; sessions vidéo avec consentement.</p><div class="out">Livrable : parcours de soin complet</div></div></div>
+      <div class="phase"><div class="num">5</div><div><h3>Dawini, messagerie, admin</h3><p>Pharmacies &amp; demandes de médicaments, messagerie, back-office (validation médecins, modération).</p><div class="out">Livrable : plateforme complète</div></div></div>
+      <div class="phase"><div class="num">6</div><div><h3>Durcissement &amp; déploiement</h3><p>Audit de sécurité, charge, observabilité (logs, alertes), mise en production, préparation des stores App Store / Play.</p><div class="out">Livrable : en ligne, surveillé, publiable</div></div></div>
+    </div>
+  </section>
+
+  <div class="note" style="margin:22px 0 0"><b>Pendant ce temps</b>, l'application actuelle (Supabase) reste en ligne et assure le lancement du congrès de décembre. La nouvelle plateforme la remplace fonctionnalité par fonctionnalité, sans coupure.</div>
+
+</div>
+
+<footer>
+  Tabibi · Architecture cible v2 · document vivant — mis à jour à chaque fonctionnalité livrée<br>
+  Spring Boot · Angular · Flutter · PostgreSQL · Keycloak · Docker
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.3/mermaid.min.js"></script>
+<script>
+  (function(){
+    function boot(){
+      if(!window.mermaid){ return; }
+      try{
+        window.mermaid.initialize({ startOnLoad:false, securityLevel:'loose', theme:'base', flowchart:{ htmlLabels:true, curve:'basis' } });
+        window.mermaid.run({ querySelector:'.mermaid' });
+      }catch(e){
+        document.querySelectorAll('.diagram').forEach(function(d){
+          var w=document.createElement('div'); w.style.cssText='font-family:var(--mono);font-size:12px;color:var(--danger);padding:8px';
+          w.textContent='(diagramme indisponible)';
+        });
+      }
+    }
+    if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', boot); } else { boot(); }
+  })();
+</script>
