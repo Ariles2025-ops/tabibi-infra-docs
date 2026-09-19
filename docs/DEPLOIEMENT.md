@@ -22,6 +22,7 @@
 13. [Application mobile](#13-application-mobile)
 14. [Évolution : grandir sans réécrire](#14-évolution--grandir-sans-réécrire)
 15. [Points de vigilance connus](#15-points-de-vigilance-connus)
+16. [Ce que la CI d'intégration prouve](#16-ce-que-la-ci-dintégration-prouve)
 
 ## 1. Vue d'ensemble
 
@@ -259,3 +260,34 @@ Changer d'hébergeur à n'importe quelle étape : sauvegarde, nouveau serveur, `
    réimporté ; passer par la console (et reporter dans le dépôt).
 5. **Jitsi public** : `meet.jit.si` sert à démarrer ; prévoir une instance dédiée pour la production.
 6. **Rétention** : `journal_acces` sans purge, sauvegardes locales 14 jours seulement (copier hors site).
+
+## 16. Ce que la CI d'intégration prouve
+
+Le workflow `integration.yml` de `tabibi-infra-docs` (push sur `main`, pull request, à la demande, chaque lundi) monte
+la même pile qu'en production, moins Caddy et TLS, à partir des **sources du jour** des trois dépôts, sans simulateur :
+l'image de l'API construite avec le `Dockerfile` de `tabibi-backend`, `postgres:16-alpine`, Keycloak 26 avec le realm
+versionné, puis l'image du front web construite avec le `Dockerfile` de `tabibi-web`. Un badge dans le README de
+`tabibi-infra-docs` montre le dernier résultat. Quand il est vert :
+
+| Prouvé | Par |
+|---|---|
+| L'image de l'API se construit depuis les sources et démarre en profil `postgres` : les 16 changelogs Liquibase s'appliquent sur un PostgreSQL 16 vierge et `ddl-auto: validate` accepte le schéma | `docker compose up --build`, attente de `/actuator/health` |
+| Le realm versionné s'importe dans Keycloak 26 et les comptes de démonstration s'y connectent (grant `password` du client `tabibi-web`) | `scenario-api.mjs`, étape « Jetons » |
+| L'API accepte les jetons signés par ce Keycloak, avec l'émetteur public et les clés lues sur le réseau interne (le montage de `docker-compose.prod.yml`), et en lit les rôles | `GET /api/moi` pour les trois comptes, 401 sans jeton |
+| Le parcours métier fonctionne de bout en bout avec la vraie base : créneau, candidature validée par l'administrateur, annuaire, réservation (201 puis 409), rendez-vous, notifications, rendez-vous honoré, avis et synthèse publique anonyme, ordonnance et vérification publique | 19 étapes du scénario |
+| Les refus sont bien ceux du serveur : 403 d'un patient sur `/api/admin/**` et sur `POST /api/medecin/creneaux` | scénario, dernière étape |
+| L'image du front web se construit, écrit `assets/config.json` à partir des variables, et son serveur de rendu appelle la **vraie** API : `/` contient « Trouver un praticien » et chaque praticien renvoyé par `GET /api/medecins`, `/medecins/<id>` contient le nom et la spécialité du praticien, la CSP autorise l'origine de l'API | `verifier-web.sh` |
+
+Ce qu'elle **ne prouve pas** (à vérifier autrement) :
+
+- Caddy, les certificats, `KC_HOSTNAME` avec un vrai domaine, `SERVER_FORWARD_HEADERS_STRATEGY=native` derrière le
+  proxy, les images GHCR (la CI construit depuis les sources) : c'est la section 8 de ce guide, sur le serveur.
+- La connexion **depuis un navigateur** (redirection OIDC, PKCE, hydratation Angular, CORS réel) : la CI n'appelle le
+  web qu'avec `curl` ; un test navigateur reste à écrire (Playwright, par exemple).
+- L'application mobile : elle parle la même API (`ApiService`), mais aucun émulateur ne tourne en CI.
+- Les rappels planifiés, les SMS / e-mails (adaptateurs absents), la charge, la restauration d'une sauvegarde.
+
+En cas d'échec, l'artefact `journaux-integration` contient `docker compose ps`, les journaux de PostgreSQL, Keycloak et
+de l'API, et ceux du serveur web ; la sortie du job montre l'étape `ECHEC` précise. Un échec après un commit dans
+`tabibi-backend` ou `tabibi-web` se reproduit en local avec `integration/lancer.sh` (voir
+[GUIDE-DEVELOPPEUR.md](GUIDE-DEVELOPPEUR.md), section 10).

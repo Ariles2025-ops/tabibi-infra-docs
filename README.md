@@ -1,5 +1,7 @@
 # Tabibi : infrastructure et documentation
 
+[![integration](https://github.com/<org>/tabibi-infra-docs/actions/workflows/integration.yml/badge.svg)](https://github.com/<org>/tabibi-infra-docs/actions/workflows/integration.yml)
+
 > **Pourquoi ce document.** C'est la porte d'entrée du projet Tabibi v2 : ce qu'est la plateforme, où sont les
 > dépôts, quels documents lire, comment tout lancer en dix minutes, où en est chaque dépôt et ce qu'il reste à faire.
 > Il s'adresse d'abord à un développeur qui rejoint l'équipe.
@@ -100,8 +102,13 @@ la fin (`down -v`).
 integration/lancer.sh
 ```
 
+Le workflow [`.github/workflows/integration.yml`](.github/workflows/integration.yml) (badge ci-dessus) rejoue tout cela
+sur GitHub Actions à chaque push sur `main`, à chaque pull request, à la demande et chaque lundi, en clonant
+`tabibi-backend` et `tabibi-web` à côté ; il construit ensuite l'image du front web, la lance face à l'API réelle et
+vérifie avec `integration/verifier-web.sh` que les pages sont rendues côté serveur avec les praticiens de l'API.
 Détails, variables et exploration de la pile dans [docs/GUIDE-DEVELOPPEUR.md](docs/GUIDE-DEVELOPPEUR.md)
-(section « Tests d'intégration des trois briques »).
+(section « Tests d'intégration des trois briques ») ; ce que la CI prouve, et ce qu'elle ne prouve pas, dans
+[docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md) (section 16).
 
 ## État d'avancement
 
@@ -157,7 +164,8 @@ README.md                      cette page
 CONTRIBUTING.md                règles de contribution
 docker-compose.yml             PostgreSQL 16 + Keycloak 26 pour le développement (identique à celui du backend)
 integration/                   tests d'intégration réels : pile Docker (docker-compose.integration.yml),
-                               scénario API (scenario-api.mjs), lanceur (lancer.sh)
+                               scénario API (scenario-api.mjs), lanceur (lancer.sh), contrôle du web (verifier-web.sh)
+.github/workflows/integration.yml   la CI qui exécute cette pile réelle (API + Keycloak + PostgreSQL + web)
 infra/keycloak/tabibi-realm.json   copie du realm de développement (source de vérité : tabibi-backend)
 docs/*.md                      les documents listés plus haut
 docs/architecture-cible.html   la version HTML autonome

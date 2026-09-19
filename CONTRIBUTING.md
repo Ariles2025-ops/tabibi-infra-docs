@@ -19,7 +19,9 @@ request.** Message conventionnel `type(scope): description` (`feat`, `fix`, `doc
   un dépôt local encore sur `master` est renommé au premier push : `git branch -M main`).
 - **Pas de push direct** : tout passe par une pull request.
 - **CI verte obligatoire** avant fusion : `mvn verify` (backend), `npm ci` + `ng build` + `ng test` (web),
-  `flutter analyze` + `flutter test` + APK (mobile). Aucun test désactivé pour « faire passer » la CI.
+  `flutter analyze` + `flutter test` + APK (mobile), et le workflow `integration` de ce dépôt (pile réelle API +
+  Keycloak + PostgreSQL + web, rejoué chaque lundi : un rouge du lundi signale une dérive entre dépôts). Aucun test
+  désactivé pour « faire passer » la CI.
 - **Revue requise** : au moins une approbation d'un autre membre ; la revue vérifie l'architecture (domaine sans
   Spring, port avant adaptateur), la sécurité (rôle **et** règle de propriétaire, aucune donnée personnelle dans les
   vues publiques, les notifications, les journaux), les tests et la documentation.

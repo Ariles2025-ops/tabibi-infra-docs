@@ -1,0 +1,119 @@
+# Integration reelle des trois briques : l'API de tabibi-backend construite depuis ses sources, PostgreSQL 16,
+# Keycloak 26 (realm et comptes de demonstration), puis le front web de tabibi-web (image node, rendu cote serveur)
+# face a cette API. Aucun simulateur : integration/lancer.sh joue le scenario API (integration/scenario-api.mjs),
+# integration/verifier-web.sh controle les pages rendues cote serveur.
+#
+# Les depots de code sont clones a cote de celui-ci ; l'organisation vient de la variable de depot ORG_GITHUB
+# (Settings > Secrets and variables > Actions > Variables), sinon du proprietaire de ce depot. Si les depots de code
+# sont prives, un secret JETON_DEPOTS (jeton avec lecture des contenus) est necessaire pour les cloner.
+name: integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # Chaque lundi a 06:00 UTC : detecte une derive entre les depots meme sans commit ici.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pile-reelle:
+    name: API + Keycloak + PostgreSQL + web
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ORG: ${{ vars.ORG_GITHUB || github.repository_owner }}
+    steps:
+      - name: Ce depot (integration/)
+        uses: actions/checkout@v4
+        with:
+          path: tabibi-infra-docs
+
+      - name: tabibi-backend (sources de l'API, Dockerfile, realm Keycloak)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ORG }}/tabibi-backend
+          path: tabibi-backend
+          token: ${{ secrets.JETON_DEPOTS || github.token }}
+
+      - name: tabibi-web (sources du front, Dockerfile)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ORG }}/tabibi-web
+          path: tabibi-web
+          token: ${{ secrets.JETON_DEPOTS || github.token }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Versions verifiees
+        run: |
+          echo "infra-docs : $(git -C tabibi-infra-docs rev-parse --short HEAD)"
+          echo "backend    : $(git -C tabibi-backend rev-parse --short HEAD) $(git -C tabibi-backend log -1 --format=%s)"
+          echo "web        : $(git -C tabibi-web rev-parse --short HEAD) $(git -C tabibi-web log -1 --format=%s)"
+          docker compose version
+          node --version
+
+      # Construit l'image de l'API, demarre la pile, joue le scenario API ; la pile reste en route pour l'etape web.
+      - name: Pile reelle et scenario API (lancer.sh)
+        working-directory: tabibi-infra-docs/integration
+        env:
+          GARDER_LA_PILE: "1"
+          TABIBI_BACKEND_DIR: ${{ github.workspace }}/tabibi-backend
+        run: ./lancer.sh
+
+      - name: Image du front web (docker build ../tabibi-web)
+        run: docker build -t tabibi-web:integration tabibi-web
+
+      # Reseau de l'hote : le serveur de rendu appelle l'API par la meme URL que le navigateur (localhost:8080,
+      # port publie par la pile). PORT=4200 : l'origine autorisee par le realm de developpement et le CORS de l'API.
+      - name: Front web face a l'API reelle
+        run: |
+          docker run -d --name tabibi-web-integration --network host \
+            -e PORT=4200 \
+            -e TABIBI_API_URL=http://localhost:8080 \
+            -e TABIBI_KEYCLOAK_ISSUER=http://localhost:8081/realms/tabibi \
+            tabibi-web:integration
+
+      - name: Pages rendues cote serveur (verifier-web.sh)
+        working-directory: tabibi-infra-docs/integration
+        env:
+          TABIBI_WEB_URL: http://localhost:4200
+          TABIBI_API_URL: http://localhost:8080
+          TABIBI_KEYCLOAK_ISSUER: http://localhost:8081/realms/tabibi
+        run: ./verifier-web.sh
+
+      - name: Journaux des conteneurs
+        if: failure()
+        working-directory: tabibi-infra-docs/integration
+        run: |
+          mkdir -p journaux
+          docker ps -a > journaux/docker-ps.txt 2>&1 || true
+          docker compose -f docker-compose.integration.yml ps > journaux/compose-ps.txt 2>&1 || true
+          docker compose -f docker-compose.integration.yml logs --no-color --timestamps > journaux/pile.log 2>&1 || true
+          docker logs tabibi-web-integration > journaux/web.log 2>&1 || true
+
+      - name: Journaux en artefact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journaux-integration
+          path: tabibi-infra-docs/integration/journaux
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Arret et nettoyage
+        if: always()
+        working-directory: tabibi-infra-docs/integration
+        run: |
+          docker rm -f tabibi-web-integration >/dev/null 2>&1 || true
+          docker compose -f docker-compose.integration.yml down -v --remove-orphans || true

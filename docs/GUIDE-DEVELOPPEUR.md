@@ -242,6 +242,8 @@ migrée par Liquibase, accepte les jetons du vrai Keycloak et enchaîne les cas 
 | `integration/docker-compose.integration.yml` | `postgres:16-alpine`, `quay.io/keycloak/keycloak:26.0` (`start-dev --import-realm`, realm `../tabibi-backend/infra/keycloak/tabibi-realm.json` monté seul, `KC_HOSTNAME=http://localhost:8081`), API construite depuis `../tabibi-backend` (`build: context`, profil `postgres`, datasource `postgres:5432/tabibi`, émetteur `http://localhost:8081/realms/tabibi`, clés lues en interne sur `keycloak:8080`), ports 8080 et 8081 publiés, `healthcheck` sur chaque service |
 | `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 19 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec |
 | `integration/lancer.sh` | `docker compose up -d --build`, attente de Keycloak et de l'API, scénario, journaux des conteneurs en cas d'échec, `down -v` |
+| `integration/verifier-web.sh` | contrôle du front web (image `tabibi-web`) lancé face à cette pile, avec `curl` seulement : `assets/config.json`, page `/` rendue côté serveur avec les praticiens de l'API, fiche `/medecins/<id>`, CSP |
+| `.github/workflows/integration.yml` | la CI qui enchaîne tout (voir plus bas) |
 
 **Le parcours vérifié** (dans l'ordre) : jetons et émetteur ; `GET /api/moi` (sujet et rôle de chaque compte) ; 401
 sans jeton ; le médecin ouvre un créneau (`POST /api/medecin/creneaux`, 201) **sans être dans l'annuaire** (en profil
@@ -281,6 +283,27 @@ scénario vérifie la revendication `iss` de chaque jeton avant d'appeler l'API.
 un nouveau rendez-vous sont créés, la synthèse compte un avis de plus. Il fonctionne aussi contre
 `mvn spring-boot:run` (profil en mémoire, annuaire seedé : l'étape de candidature est alors sautée) avec le
 `docker-compose.yml` de développement.
+
+**Le front web face à la pile.** L'image `tabibi-web` rend les pages publiques côté serveur en appelant l'API par
+`TABIBI_API_URL`, depuis le conteneur ; `localhost:8080` n'y désigne l'hôte qu'avec le réseau de l'hôte
+(`--network host`, Linux). `PORT=4200` évite le port 80 et correspond à l'origine autorisée par le realm et le CORS.
+
+```bash
+GARDER_LA_PILE=1 integration/lancer.sh
+docker build -t tabibi-web:integration ../tabibi-web
+docker run -d --name tabibi-web-integration --network host -e PORT=4200 \
+  -e TABIBI_API_URL=http://localhost:8080 -e TABIBI_KEYCLOAK_ISSUER=http://localhost:8081/realms/tabibi tabibi-web:integration
+integration/verifier-web.sh                 # config.json, / avec les praticiens de l'API, fiche, CSP ; OK / ECHEC
+docker rm -f tabibi-web-integration && docker compose -f integration/docker-compose.integration.yml down -v
+```
+
+**En CI.** `.github/workflows/integration.yml` (push sur `main`, pull request, `workflow_dispatch`, chaque lundi
+06:00 UTC ; 30 minutes au plus) clone ce dépôt puis `<org>/tabibi-backend` et `<org>/tabibi-web` à côté (`<org>` =
+variable de dépôt `ORG_GITHUB`, sinon le propriétaire du dépôt ; secret `JETON_DEPOTS` si les dépôts de code sont
+privés), exécute `lancer.sh` (pile conservée), construit et lance l'image web, exécute `verifier-web.sh`, publie les
+journaux des conteneurs en artefact `journaux-integration` en cas d'échec, puis détruit tout. Le badge du README
+montre le dernier résultat. Ce que la CI prouve, et ne prouve pas, est détaillé dans
+[DEPLOIEMENT.md](DEPLOIEMENT.md) (section 16).
 
 **Ajouter une étape** : une fonction `etape('Libellé', async () => { ... })` avec `appelAttendu(méthode, chemin,
 statut, { jeton, corps })` et `verifier(condition, message)` ; garder l'ordre du parcours (chaque étape s'appuie sur
