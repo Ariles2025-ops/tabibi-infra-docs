@@ -20,7 +20,8 @@
 9. [Front web (Angular)](#9-front-web-angular)
 10. [Application mobile (Flutter)](#10-application-mobile-flutter)
 11. [Parcours clés (séquences)](#11-parcours-clés-séquences)
-12. [Conventions](#12-conventions)
+12. [Testabilité : trois niveaux de preuve](#12-testabilité--trois-niveaux-de-preuve)
+13. [Conventions](#13-conventions)
 
 ## 1. Principes
 
@@ -28,7 +29,7 @@
 |---|---|
 | **Sécurité d'abord** | Les données manipulées sont des données de patients. L'identité est déléguée à Keycloak (OIDC, PKCE, MFA possible), l'API valide un JWT à chaque requête, l'autorisation se joue côté serveur (rôle puis règle de propriétaire), les journaux et les notifications ne contiennent jamais de donnée de santé. |
 | **Portabilité** | JPA + Liquibase (base remplaçable), tout est conteneurisé (hébergeur remplaçable), configuration par variables d'environnement, aucune dépendance à un service propriétaire. |
-| **Testabilité** | Chaque fonctionnalité arrive avec ses tests : domaine, service, tranche web (401 / 403 / codes HTTP), intégration PostgreSQL (Testcontainers), specs Angular, tests Flutter ; et l'ensemble est prouvé par la pile d'intégration réelle de `tabibi-infra-docs` (API + Keycloak + PostgreSQL + web, workflow `integration`). |
+| **Testabilité** | Trois niveaux de preuve, détaillés en [section 12](#12-testabilité--trois-niveaux-de-preuve) : unitaire et tranche dans chaque dépôt, bout en bout hors ligne dans le dépôt, puis la pile réelle de `tabibi-infra-docs` (API + Keycloak + PostgreSQL + web dans un vrai navigateur, workflow `integration`). Un seul outil de test navigateur dans tout le projet : Playwright. |
 | **Clarté** | Architecture hexagonale, un module par domaine métier, nommage en français, un commit par fonctionnalité, journal tenu dans chaque dépôt. |
 | **Progressivité** | On construit fonctionnalité par fonctionnalité, on déploie sur un serveur unique, on peut grandir sans réécrire (voir [DEPLOIEMENT.md](DEPLOIEMENT.md)). |
 
@@ -474,7 +475,28 @@ rafraîchissement), pas de notifications push, pas d'icône ni d'écran de lance
 
 ![Séquence : planificateur horaire et déclenchement manuel des rappels](images/sequence-rappels.png)
 
-## 12. Conventions
+## 12. Testabilité : trois niveaux de preuve
+
+Les tests du projet ne se répètent pas : chaque niveau prouve ce que le précédent ne peut pas prouver, et coûte plus
+cher à faire tourner. On écrit au niveau le plus bas qui puisse répondre à la question.
+
+| Niveau | Où | Ce qui tourne | Ce que cela prouve | Ce que cela ne prouve pas |
+|---|---|---|---|---|
+| **1. Unitaire et tranche** | chaque dépôt de code | JVM ou navigateur headless, sans réseau : tests de domaine et de service, `@WebMvcTest` avec un jeton factice, specs Angular avec services factices, tests Flutter avec `FakeApiService` | les règles métier, les codes HTTP, les 401 / 403, le rendu d'un composant — en quelques secondes, à chaque sauvegarde | que les briques se parlent |
+| **2. Bout en bout dans le dépôt** | `tabibi-backend` (`ScenarioApiTest`), `tabibi-web` (Playwright sur une API simulée) | l'application entière, mais avec des adaptateurs en mémoire ou une API simulée : ni Docker, ni base, ni Keycloak | qu'un parcours complet tient d'un bout à l'autre du dépôt, hors ligne, en moins d'une minute | que la vraie base, le vrai Keycloak et les vraies images fonctionnent ensemble |
+| **3. Pile réelle** | `tabibi-infra-docs`, `integration/` | PostgreSQL 16, Keycloak 26 avec le realm versionné, l'API construite depuis les sources, l'image du front web — puis `scenario-api.mjs` (vrais jetons, 20 étapes) et **Playwright dans Chromium** sur le front (`integration/web`, 10 tests) | que les migrations Liquibase passent sur une base vierge, que les jetons du vrai Keycloak sont acceptés, que le rendu côté serveur appelle la vraie API, et que l'application se comporte comme prévu dans un navigateur devant ces données-là | la mise en production elle-même : Caddy, TLS, domaine réel, images publiées (voir [DEPLOIEMENT.md](DEPLOIEMENT.md), section 16) |
+
+**Un seul outil de test navigateur dans tout le projet : Playwright.** Le même outil sert au niveau 2 (dans
+`tabibi-web`, devant une API simulée) et au niveau 3 (dans `tabibi-infra-docs`, devant la pile réelle) : mêmes aides
+(`ouvrir()` attend l'hydratation d'Angular avant tout clic), même façon de lire un échec (trace, capture, vidéo),
+même Chromium. Un test écrit d'un côté se relit de l'autre, et rien d'autre — ni `curl`, ni un second framework —
+n'est utilisé pour vérifier une page.
+
+Deux règles pour le niveau 3 : **aucune donnée codée en dur** (les attentes sont construites à partir de ce que
+renvoie l'API réelle, dont le contenu change à chaque exécution) et **rien n'est simulé** (pas de `webServer`
+Playwright : la pile est déjà debout quand les tests commencent).
+
+## 13. Conventions
 
 - **Nommage en français** dans le code (classes, méthodes, tables, routes, messages), sans accents dans les
   identifiants (`RendezVous`, `creneau`, `honorer`), avec accents dans les textes affichés et la documentation.

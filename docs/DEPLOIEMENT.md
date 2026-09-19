@@ -262,7 +262,8 @@ Changer d'hébergeur à n'importe quelle étape : sauvegarde, nouveau serveur, `
 Le workflow `integration.yml` de `tabibi-infra-docs` (push sur `main`, pull request, à la demande, chaque lundi) monte
 la même pile qu'en production, moins Caddy et TLS, à partir des **sources du jour** des trois dépôts, sans simulateur :
 l'image de l'API construite avec le `Dockerfile` de `tabibi-backend`, `postgres:16-alpine`, Keycloak 26 avec le realm
-versionné, puis l'image du front web construite avec le `Dockerfile` de `tabibi-web`. Un badge dans le README de
+versionné, puis l'image du front web construite avec le `Dockerfile` de `tabibi-web`, ouverte dans un **vrai
+navigateur** (Chromium piloté par Playwright, le seul outil de test navigateur du projet). Un badge dans le README de
 `tabibi-infra-docs` montre le dernier résultat. Quand il est vert :
 
 | Prouvé | Par |
@@ -272,19 +273,27 @@ versionné, puis l'image du front web construite avec le `Dockerfile` de `tabibi
 | L'API accepte les jetons signés par ce Keycloak, avec l'émetteur public et les clés lues sur le réseau interne (le montage de `docker-compose.prod.yml`), et en lit les rôles | `GET /api/moi` pour les trois comptes, 401 sans jeton |
 | Le parcours métier fonctionne de bout en bout avec la vraie base : créneau, candidature validée par l'administrateur, annuaire, réservation (201 puis 409), rendez-vous, notifications, rendez-vous honoré, avis et synthèse publique anonyme, ordonnance, vérification publique et PDF imprimable (OpenPDF et ZXing dans le JRE alpine de l'image) | 20 étapes du scénario |
 | Les refus sont bien ceux du serveur : 403 d'un patient sur `/api/admin/**` et sur `POST /api/medecin/creneaux` | scénario, dernière étape |
-| L'image du front web se construit, écrit `assets/config.json` à partir des variables, et son serveur de rendu appelle la **vraie** API : `/` contient « Trouver un praticien » et chaque praticien renvoyé par `GET /api/medecins`, `/medecins/<id>` contient le nom et la spécialité du praticien, la CSP autorise l'origine de l'API | `verifier-web.sh` |
+| L'image du front web se construit, écrit `assets/config.json` à partir des variables, et son serveur de rendu appelle la **vraie** API : `/` contient « Trouver un praticien » et chaque praticien renvoyé par `GET /api/medecins`, `/medecins/<id>` contient le nom et la spécialité du praticien, la CSP autorise l'origine de l'API | tests Playwright de `integration/web` (HTML relu sans navigateur : le JavaScript n'a pas tourné) |
+| **Dans un vrai navigateur** (Chromium) : l'application s'hydrate, la recherche par spécialité filtre réellement la liste comme l'API avec le même filtre, `/verifier` refuse un code inconnu, le sélecteur de langue bascule la page en arabe (`dir="rtl"`) — le tout sur les données réelles de l'API, rien n'est codé en dur dans les tests | `integration/web/tests/pile-reelle.spec.ts`, 10 tests |
+| Une page privée (`/mes-rendez-vous`) renvoie vers le **Keycloak réel** : la navigation finit sur l'émetteur de la pile (`realms/tabibi`, `auth`), avec `client_id=tabibi-web` et `response_type=code` | même fichier, test « page privée » |
+| `robots.txt` et `sitemap.xml` sont servis, et le plan du site annonce la fiche du premier praticien de l'API | même fichier, test « robots.txt et sitemap.xml » |
 
 Ce qu'elle **ne prouve pas** (à vérifier autrement) :
 
 - Caddy, les certificats, `KC_HOSTNAME` avec un vrai domaine, `SERVER_FORWARD_HEADERS_STRATEGY=native` derrière le
   proxy, les images GHCR (la CI construit depuis les sources) : c'est la section 8 de ce guide, sur le serveur.
-- La connexion **depuis un navigateur** (redirection OIDC, PKCE, CORS réel) : la CI n'appelle le web qu'avec `curl` ;
-  les tests Playwright de `tabibi-web` (v0.21.0) couvrent l'hydratation et les pages publiques, mais sur une API
-  simulée ; les brancher sur cette pile réelle est la suite logique.
+- La connexion **jusqu'au bout** depuis un navigateur : la CI prouve que la page privée part vers le Keycloak réel
+  avec les bons paramètres OIDC, pas qu'un compte s'y connecte (saisie du mot de passe, PKCE, retour du code,
+  échange du jeton, appel authentifié). Il faudra pour cela piloter la page de connexion de Keycloak.
+- Le cas du **code valide** de `/verifier` : le scénario API émet une vraie ordonnance, mais son code n'est pas
+  encore transmis aux tests navigateur (variable `CODE_ORDONNANCE`) ; ce test est sauté tant qu'elle est absente, et
+  le journal du job le dit. Le cas du code inconnu, lui, est vérifié.
 - L'application mobile : elle parle la même API (`ApiService`), mais aucun émulateur ne tourne en CI.
 - Les rappels planifiés, les SMS / e-mails (adaptateurs absents), la charge, la restauration d'une sauvegarde.
 
 En cas d'échec, l'artefact `journaux-integration` contient `docker compose ps`, les journaux de PostgreSQL, Keycloak et
-de l'API, et ceux du serveur web ; la sortie du job montre l'étape `ECHEC` précise. Un échec après un commit dans
+de l'API, et ceux du serveur web ; la sortie du job montre l'étape `ECHEC` précise. L'artefact
+`playwright-integration-web`, lui, est publié à **chaque** exécution : rapport HTML, et pour chaque test rouge la
+trace (DOM, réseau, console, pas à pas), la capture d'écran et la vidéo — de quoi voir la page telle qu'elle était. Un échec après un commit dans
 `tabibi-backend` ou `tabibi-web` se reproduit en local avec `integration/lancer.sh` (voir
 [GUIDE-DEVELOPPEUR.md](GUIDE-DEVELOPPEUR.md), section 10).

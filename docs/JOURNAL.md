@@ -4,8 +4,8 @@
 > ce journal-ci les fusionne en une seule chronologie, avec le dépôt, la version, le hash du commit et un résumé,
 > pour voir d'un coup d'oeil comment le produit a été construit et retrouver le commit d'une fonctionnalité. Le
 > détail (règles métier, endpoints, tests) reste dans le journal du dépôt concerné. Ordre chronologique des commits
-> (dates UTC), état au 19 septembre 2026 (recompté par `git rev-list --count HEAD` à cette date) : backend 27 commits
-> (v0.24.1), web 23 commits (v0.21.0), mobile 14 commits (v0.13.0), infra-docs 16 commits. D'autres commits arrivent en
+> (dates UTC), état au 19 septembre 2026 (recompté par `git rev-list --count HEAD` à cette date) : backend 31 commits
+> (v0.27.0), web 26 commits (v0.23.0), mobile 16 commits (v0.15.0), infra-docs 20 commits. D'autres commits arrivent en
 > parallèle dans les dépôts de code : recompter (`git rev-list --count HEAD`) avant de citer ces chiffres.
 
 ## Comment lire
@@ -103,10 +103,14 @@
 | 2026-09-19 | web | v0.23.0 | `4b5ca61` | Interface en français, arabe et anglais : service de traduction à l'exécution (signal + dictionnaires de ~430 clés), pipes `t` et `dateLocale`, `lang`/`dir` corrects jusqu'au rendu serveur (`Accept-Language`), styles RTL, sélecteur de langue, titres et descriptions traduits ; 331 specs, 19 tests de bout en bout |
 | 2026-09-19 | mobile | v0.15.0 | `defce12` | Interface en français, arabe et anglais : dictionnaires de 250 clés, `LangueScope` et `t(...)`, `MaterialApp` localisée (RTL par la locale), dates `intl`, écran « Langue », langue initialisée depuis le profil |
 | 2026-09-19 | infra | — | (ce commit) | Journal complété pour la vague « impression, langues, données personnelles et supervision » |
+| 2026-09-19 | web | — | `cc107ae` | Socle Playwright : Playwright devient l'outil unique du dépôt web (projets `logique`, sans navigateur, et `navigateur`, Chromium sur le build SSR face à l'API simulée), `e2e/` devient `tests/parcours/`, aides réutilisables `ouvrir` / `connecter` / `stub` / `requetes` ; 19 → 77 tests Playwright, 331 → 257 specs Karma |
+| 2026-09-19 | infra | — | `84369d5` | Le front vérifié en **Playwright contre la pile réelle** : `integration/web` (`@playwright/test` seul, projet `chromium`, aucun `webServer`), `tests/outils.ts` (`ouvrir` qui attend l'hydratation, `lireApi` / `praticiens` qui construisent les attentes depuis l'API réelle, `htmlRendu` pour le rendu serveur) et 10 tests : configuration servie, accueil et fiche avec les praticiens de l'API, recherche par spécialité réellement filtrante, code d'ordonnance inconnu (et valide si `CODE_ORDONNANCE`), page privée vers le Keycloak réel, `robots.txt` et `sitemap.xml`, CSP, bascule en arabe. `verifier-web.sh` réécrit en lanceur mince ; le contrôle en `curl` disparaît |
+| 2026-09-19 | infra | — | `e86ac20` | CI d'intégration : étape Playwright à la place de l'étape `curl` (cache npm, `playwright install --with-deps chromium`), rapport HTML, traces, captures et vidéos publiés en artefact `playwright-integration-web` à chaque exécution, journaux des conteneurs et `down -v` conservés |
+| 2026-09-19 | infra | — | (ce commit) | Documentation de l'outil unique : README (tests d'intégration réels, avancement), guide du développeur (lancer les tests en local, lire le rapport et les traces), déploiement (ce que la CI prouve : navigateur réel, et ce qu'elle ne prouve pas), architecture (section 12, trois niveaux de preuve) |
 
 ## Ce que dit ce journal
 
-- **89 commits** en deux jours : 31 backend, 25 web, 16 mobile, plus ce dépôt (17).
+- **93 commits** en deux jours : 31 backend, 26 web, 16 mobile, plus ce dépôt (20).
 - Chaque fonctionnalité a été livrée **API d'abord**, puis web, puis mobile pour le patient, avec ses tests et
   son entrée de journal : la trace est complète du besoin au commit.
 - Les derniers commits du backend et du web sont consacrés à la **mise en production** (images, orchestration,
@@ -118,3 +122,7 @@
   Docker (`ScenarioApiTest` côté backend, Playwright sur une API simulée côté web) ; dans ce dépôt, la pile réelle
   en Docker (API construite depuis les sources, PostgreSQL, Keycloak, vrais jetons) et le front web rendu côté
   serveur face à la vraie API, rejoués par GitHub Actions à chaque changement et chaque semaine.
+- La **dernière vague** unifie l'outillage de test navigateur : **Playwright partout**, dans `tabibi-web` devant une
+  API simulée et dans ce dépôt devant la pile réelle, dans un vrai Chromium. Le contrôle en `curl` du front a
+  disparu ; rapports, traces, captures et vidéos sont publiés par la CI d'intégration. Les trois niveaux de preuve
+  sont décrits dans [ARCHITECTURE.md](ARCHITECTURE.md), section 12.

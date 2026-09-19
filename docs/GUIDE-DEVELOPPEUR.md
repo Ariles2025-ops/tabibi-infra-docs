@@ -92,12 +92,18 @@ docker build -t tabibi-backend .                             # image de producti
 ```bash
 npm install
 npm start                                                    # ng serve, http://localhost:4200
-npx ng test --watch=false --browsers=ChromeHeadlessCI        # 271 specs, Chrome headless sans bac à sable
+npx ng test --watch=false --browsers=ChromeHeadlessCI        # specs unitaires, Chrome headless sans bac à sable
+npm run e2e                                                  # Playwright : le build SSR face à une API simulée
 npx ng build                                                 # dist/tabibi-web/browser et server/server.mjs
 npm run serve:ssr                                            # http://localhost:4000 : build de production rendu côté serveur
 docker build -t tabibi-web . && docker run --rm -p 4200:80 -e TABIBI_API_URL=http://localhost:8080 \
   -e TABIBI_KEYCLOAK_ISSUER=http://localhost:8081/realms/tabibi tabibi-web      # image Node (SSR)
 ```
+
+**Un seul outil de test navigateur dans tout le projet : Playwright.** Dans `tabibi-web` il ouvre le build de
+production face à une API simulée (rapide, hors ligne, pas de Docker) ; dans ce dépôt, `integration/web` ouvre la même
+application face à la **pile réelle** (section 10). Même outil, mêmes aides (`ouvrir()` qui attend l'hydratation),
+mêmes traces à lire : un test écrit d'un côté se relit de l'autre.
 
 - Configuration : `src/assets/config.json` (`apiUrl`, `keycloakIssuer`, `keycloakClientId`), lue par `ConfigService`
   avant le démarrage (côté serveur : `CONFIGURATION_SERVEUR` depuis `process.env`) ; remplacée au déploiement,
@@ -242,7 +248,8 @@ migrée par Liquibase, accepte les jetons du vrai Keycloak et enchaîne les cas 
 | `integration/docker-compose.integration.yml` | `postgres:16-alpine`, `quay.io/keycloak/keycloak:26.0` (`start-dev --import-realm`, realm `../tabibi-backend/infra/keycloak/tabibi-realm.json` monté seul, `KC_HOSTNAME=http://localhost:8081`), API construite depuis `../tabibi-backend` (`build: context`, profil `postgres`, datasource `postgres:5432/tabibi`, émetteur `http://localhost:8081/realms/tabibi`, clés lues en interne sur `keycloak:8080`), ports 8080 et 8081 publiés, `healthcheck` sur chaque service |
 | `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 20 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec |
 | `integration/lancer.sh` | `docker compose up -d --build`, attente de Keycloak et de l'API, scénario, journaux des conteneurs en cas d'échec, `down -v` |
-| `integration/verifier-web.sh` | contrôle du front web (image `tabibi-web`) lancé face à cette pile, avec `curl` seulement : `assets/config.json`, page `/` rendue côté serveur avec les praticiens de l'API, fiche `/medecins/<id>`, CSP |
+| `integration/verifier-web.sh` | lanceur mince des tests navigateur : dépendances (`npm ci`), Chromium de Playwright si besoin, puis `npx playwright test` |
+| `integration/web/` | les tests eux-mêmes : `package.json` (`@playwright/test` seul), `playwright.config.ts` (projet `chromium`, `baseURL` = `URL_WEB`, trace / capture / vidéo conservées en cas d'échec, **pas de `webServer`** : la pile est déjà lancée), `tests/outils.ts` (`ouvrir()` qui attend l'hydratation, `lireApi()` / `praticiens()` qui interrogent l'API réelle, `htmlRendu()` qui relit le HTML sans navigateur), `tests/pile-reelle.spec.ts` (10 tests) |
 | `.github/workflows/integration.yml` | la CI qui enchaîne tout (voir plus bas) |
 
 **Le parcours vérifié** (dans l'ordre) : jetons et émetteur ; `GET /api/moi` (sujet et rôle de chaque compte) ; 401
@@ -285,27 +292,80 @@ un nouveau rendez-vous sont créés, la synthèse compte un avis de plus. Il fon
 `mvn spring-boot:run` (profil en mémoire, annuaire seedé : l'étape de candidature est alors sautée) avec le
 `docker-compose.yml` de développement.
 
-**Le front web face à la pile.** L'image `tabibi-web` rend les pages publiques côté serveur en appelant l'API par
-`TABIBI_API_URL`, depuis le conteneur ; `localhost:8080` n'y désigne l'hôte qu'avec le réseau de l'hôte
-(`--network host`, Linux). `PORT=4200` évite le port 80 et correspond à l'origine autorisée par le realm et le CORS.
+**Le front web face à la pile, dans un vrai navigateur.** L'image `tabibi-web` rend les pages publiques côté serveur
+en appelant l'API par `TABIBI_API_URL`, depuis le conteneur ; `localhost:8080` n'y désigne l'hôte qu'avec le réseau de
+l'hôte (`--network host`, Linux). `PORT=4200` évite le port 80 et correspond à l'origine autorisée par le realm et le
+CORS. La vérification passe par **Playwright** : c'est le seul outil de test navigateur du projet, ici comme dans
+`tabibi-web`.
 
 ```bash
 GARDER_LA_PILE=1 integration/lancer.sh
 docker build -t tabibi-web:integration ../tabibi-web
 docker run -d --name tabibi-web-integration --network host -e PORT=4200 \
   -e TABIBI_API_URL=http://localhost:8080 -e TABIBI_KEYCLOAK_ISSUER=http://localhost:8081/realms/tabibi tabibi-web:integration
-integration/verifier-web.sh                 # config.json, / avec les praticiens de l'API, fiche, CSP ; OK / ECHEC
+integration/verifier-web.sh                 # dépendances + Chromium si besoin, puis les 10 tests Playwright
 docker rm -f tabibi-web-integration && docker compose -f integration/docker-compose.integration.yml down -v
 ```
+
+Une fois les dépendances installées, les tests se relancent directement depuis `integration/web` :
+
+```bash
+cd integration/web
+npm ci                                      # une seule fois (@playwright/test)
+npx playwright install chromium             # une seule fois (--with-deps en CI, pour les bibliothèques système)
+npm test                                    # les 10 tests
+npx playwright test --list                  # ce qui serait exécuté, sans rien lancer
+npx playwright test -g "recherche"          # un seul test
+npx playwright test --headed --debug        # voir le navigateur, pas à pas
+CHROME_BIN=/chemin/vers/chrome npm test     # un Chrome déjà installé au lieu du Chromium de Playwright
+```
+
+**Ce que ces dix tests vérifient**, à partir des **vraies données de l'API** (rien n'est codé en dur : la liste des
+praticiens, leurs identifiants, leur spécialité et le résultat du filtre viennent de `GET /api/medecins`) :
+`assets/config.json` sert l'URL de l'API et l'émetteur Keycloak de la pile ; l'accueil rendu côté serveur affiche
+« Trouver un praticien » et chaque praticien de l'API (échec si l'annuaire est vide : le scénario API a-t-il tourné ?) ;
+la fiche du premier praticien affiche son nom et sa spécialité ; la recherche par spécialité filtre la liste comme
+l'API avec le même filtre ; `/verifier` refuse un code inconnu ; `/mes-rendez-vous` part vers le Keycloak réel
+(`realms/tabibi` et `auth` dans l'URL) ou annonce la redirection ; `robots.txt` et `sitemap.xml` répondent et le plan
+du site annonce la fiche du premier praticien ; la CSP autorise l'origine de l'API ; le sélecteur de langue bascule la
+page en arabe (`dir="rtl"`, `lang="ar"`, titre arabe).
+
+Variables : `URL_WEB` (`http://localhost:4200`), `URL_API` (`http://localhost:8080`), `ISSUER_KEYCLOAK`
+(`http://localhost:8081/realms/tabibi`), `CHROME_BIN`, et `CODE_ORDONNANCE` — le code d'une ordonnance réellement
+émise par `scenario-api.mjs`. Sans lui, le cas du code **valide** de `/verifier` est sauté (`test.skip` avec le motif
+affiché) ; le cas du code inconnu, lui, est toujours vérifié. Les anciens noms `TABIBI_WEB_URL`, `TABIBI_API_URL` et
+`TABIBI_KEYCLOAK_ISSUER` restent acceptés.
+
+**Lire un échec.** Playwright garde une trace, une capture et une vidéo de chaque test rouge :
+
+```bash
+cd integration/web
+npx playwright show-report                            # le rapport HTML (playwright-report/)
+npx playwright show-trace test-results/<test>/trace.zip   # la trace : DOM, réseau, console, pas à pas
+ls test-results/<test>/                               # capture test-failed-1.png et vidéo video.webm
+```
+
+En CI, tout cela est publié en artefact `playwright-integration-web` (rapport + traces), succès comme échec :
+télécharger l'artefact, le décompresser, puis `npx playwright show-report <dossier>`. Ni `node_modules`, ni
+`playwright-report`, ni `test-results` ne sont commités (`integration/web/.gitignore`).
 
 **En CI.** `.github/workflows/integration.yml` (push sur `main`, pull request, `workflow_dispatch`, chaque lundi
 06:00 UTC ; 30 minutes au plus) clone ce dépôt puis `<org>/tabibi-backend` et `<org>/tabibi-web` à côté (`<org>` =
 variable de dépôt `ORG_GITHUB`, sinon le propriétaire du dépôt ; secret `JETON_DEPOTS` si les dépôts de code sont
-privés), exécute `lancer.sh` (pile conservée), construit et lance l'image web, exécute `verifier-web.sh`, publie les
-journaux des conteneurs en artefact `journaux-integration` en cas d'échec, puis détruit tout. Le badge du README
+privés), exécute `lancer.sh` (pile conservée), construit et lance l'image web, installe les dépendances et le
+Chromium de Playwright (cache npm sur `integration/web/package-lock.json`), exécute `verifier-web.sh`, publie le
+rapport Playwright et les traces en artefact `playwright-integration-web` (toujours) et les journaux des conteneurs en
+artefact `journaux-integration` en cas d'échec, puis détruit tout (`down -v`). Le badge du README
 montre le dernier résultat. Ce que la CI prouve, et ne prouve pas, est détaillé dans
 [DEPLOIEMENT.md](DEPLOIEMENT.md) (section 16).
 
 **Ajouter une étape** : une fonction `etape('Libellé', async () => { ... })` avec `appelAttendu(méthode, chemin,
 statut, { jeton, corps })` et `verifier(condition, message)` ; garder l'ordre du parcours (chaque étape s'appuie sur
 l'état `etat` des précédentes) et ne jamais dépendre d'un compte autre que les trois comptes de démonstration.
+
+**Ajouter un test navigateur** : un `test('libellé', async ({ page, request }) => { ... })` dans
+`integration/web/tests/pile-reelle.spec.ts`, en ouvrant les pages avec `ouvrir(page, '/chemin')` (qui attend
+l'hydratation : un clic fait trop tôt est perdu) et en construisant l'attente avec `lireApi()` ou `praticiens()`
+plutôt qu'avec une valeur écrite dans le test — la pile est réelle, ses données changent à chaque exécution. Pour une
+page qui doit être rendue **côté serveur**, relire le HTML avec `htmlRendu(request, chemin, marqueur)` : le
+JavaScript n'a alors pas tourné.
