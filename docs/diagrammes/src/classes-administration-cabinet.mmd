@@ -1,0 +1,114 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class CandidatureMedecin {
+    <<record, immuable>>
+    +UUID id
+    +UUID medecinId
+    +String nomComplet
+    +String specialiteSlug
+    +String specialiteFr
+    +String wilayaCode
+    +String wilayaFr
+    +String ville
+    +String numeroOrdre
+    +String telephone
+    +StatutCandidature statut
+    +String motifRefus
+    +Instant deposeeLe
+    +Instant traiteeLe
+    +deposer(medecinId, demande, quand)$ CandidatureMedecin
+    +valider(quand) CandidatureMedecin
+    +refuser(motif, quand) CandidatureMedecin
+    +estEnAttente() boolean
+  }
+  class StatutCandidature {
+    <<enumeration>>
+    EN_ATTENTE
+    VALIDEE
+    REFUSEE
+  }
+  class Medecin {
+    <<record, module annuaire>>
+    +UUID id
+    +String nomComplet
+    +String specialiteSlug
+    +String specialiteFr
+    +String wilayaCode
+    +String wilayaFr
+    +String ville
+  }
+  class CandidatureRepository {
+    <<interface, port>>
+    +enregistrer(c) CandidatureMedecin
+    +parId(id) Optional~CandidatureMedecin~
+    +derniereDuMedecin(medecinId) Optional~CandidatureMedecin~
+    +lister(statut) List~CandidatureMedecin~
+    +compter(statut) long
+  }
+  class MedecinRepository {
+    <<interface, port du module annuaire>>
+    +rechercher(critere) List~Medecin~
+    +parId(id) Optional~Medecin~
+    +enregistrer(medecin) Medecin
+  }
+  class AdministrationService {
+    <<service>>
+    +deposer(medecinId, demande) CandidatureMedecin
+    +maCandidature(medecinId) CandidatureMedecin
+    +lister(statut) List~CandidatureMedecin~
+    +valider(candidatureId) CandidatureMedecin
+    +refuser(candidatureId, motif) CandidatureMedecin
+    +statistiques() StatistiquesAdministration
+  }
+  class Rattachement {
+    <<record, immuable>>
+    +UUID id
+    +UUID medecinId
+    +UUID secretaireId
+    +Instant creeLe
+    +rattacher(medecinId, secretaireId, quand)$ Rattachement
+    +concerneMedecin(medecinId) boolean
+    +concerneSecretaire(secretaireId) boolean
+  }
+  class RattachementRepository {
+    <<interface, port>>
+    +enregistrer(r) Rattachement
+    +parId(id) Optional~Rattachement~
+    +parMedecinEtSecretaire(medecinId, secretaireId) Optional~Rattachement~
+    +parMedecin(medecinId) List~Rattachement~
+    +parSecretaire(secretaireId) List~Rattachement~
+    +supprimer(id)
+  }
+  class CabinetService {
+    <<service>>
+    +rattacher(medecinId, secretaireId) Rattachement
+    +secretairesDuMedecin(medecinId) List~Rattachement~
+    +retirer(medecinId, rattachementId)
+    +medecinsDeLaSecretaire(secretaireId) List~Rattachement~
+    +verifierAcces(secretaireId, medecinId)
+    +agendaPour(secretaireId, medecinId) List~RendezVous~
+    +ouvrirCreneauPour(secretaireId, medecinId, debut, duree) Creneau
+    +honorerPour(secretaireId, rendezVousId) RendezVous
+    +annulerPour(secretaireId, rendezVousId) RendezVous
+  }
+  class RendezVousService {
+    <<service du module rendezvous>>
+  }
+  class CreneauService {
+    <<service du module creneaux>>
+  }
+  class Notifieur {
+    <<port du module notifications>>
+  }
+
+  CandidatureMedecin --> StatutCandidature : statut
+  CandidatureMedecin ..> Medecin : valider() publie la fiche
+  AdministrationService --> CandidatureRepository
+  AdministrationService --> MedecinRepository : enregistrer(Medecin)
+  AdministrationService --> Notifieur : validée, refusée
+  CabinetService --> RattachementRepository
+  CabinetService --> RendezVousService : agenda, honorer, annulerParCabinet
+  CabinetService --> CreneauService : ouvrir
+  CabinetService --> Notifieur : rattachement, retrait
+  RattachementRepository ..> Rattachement

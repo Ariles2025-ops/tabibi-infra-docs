@@ -1,0 +1,44 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+sequenceDiagram
+  autonumber
+  actor M as Médecin
+  actor P as Patient
+  participant APP as Web (médecin)<br/>web ou mobile (patient)
+  participant API as API<br/>TeleconsultationController<br/>+ TeleconsultationService
+  participant DB as Ports de persistance<br/>RendezVousRepository<br/>TeleconsultationRepository
+  participant N as Notifieur
+  participant J as Jitsi Meet
+
+  M->>APP: « Proposer une téléconsultation »<br/>sur un rendez-vous CONFIRME
+  APP->>API: POST /api/medecin/teleconsultations<br/>{ rendezVousId } (JWT MEDECIN)
+  API->>DB: parId(rendezVousId)
+  DB-->>API: RendezVous : 404 absent, 403 autre médecin,<br/>409 non confirmé ou session déjà planifiée
+  API->>API: GenerateurSalle : tabibi- + 32 hexadécimaux<br/>(SecureRandom, non devinable)
+  API->>DB: enregistrer(Teleconsultation PLANIFIEE)
+  API->>N: notifier(patient, « Teleconsultation proposee »)
+  API-->>APP: 201 : lienSalle visible pour le médecin
+
+  P->>APP: Ouvre « Mes téléconsultations »
+  APP->>API: GET /api/teleconsultations/mes (JWT PATIENT)
+  API-->>APP: 200 : lienSalle = null<br/>tant que le patient n'a pas consenti
+  P->>APP: « Je donne mon consentement »<br/>(vidéo via un tiers, aucun enregistrement)
+  APP->>API: POST /api/teleconsultations/{id}/consentir
+  API->>DB: enregistrer(consentementPatientLe = maintenant)<br/>idempotent, 409 si terminée ou annulée
+  API-->>APP: 200 : lienSalle = base-url/salleId
+
+  M->>APP: « Démarrer »
+  APP->>API: POST /api/teleconsultations/{id}/demarrer (JWT MEDECIN)
+  alt patient sans consentement
+    API-->>APP: 409 { erreur : le patient n'a pas encore consenti }
+  else consentement donné
+    API->>DB: enregistrer(EN_COURS, demarreeLe)
+    API->>N: notifier(patient, « Teleconsultation demarree »)
+    API-->>APP: 200
+    M->>J: Ouvre la salle (nouvel onglet)
+    P->>J: Rejoint la salle (navigateur externe sur mobile)
+  end
+
+  M->>APP: « Terminer »
+  APP->>API: POST /api/teleconsultations/{id}/terminer
+  API->>DB: enregistrer(TERMINEE, termineeLe) : exige EN_COURS
+  API-->>APP: 200

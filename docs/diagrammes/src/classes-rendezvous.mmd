@@ -1,0 +1,97 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class RendezVous {
+    -UUID id
+    -UUID patientId
+    -UUID medecinId
+    -Instant debut
+    -UUID creneauId
+    -StatutRdv statut
+    -Instant rappelEnvoyeLe
+    +confirmer(patientId, medecinId, debut, creneauId)$ RendezVous
+    +annuler()
+    +annulerParCabinet()
+    +honorer()
+    +appartientA(patientId) boolean
+    +estAvec(medecinId) boolean
+    +estAnnule() boolean
+    +marquerRappelEnvoye(quand)
+    +rappelEnvoye() boolean
+  }
+  class StatutRdv {
+    <<enumeration>>
+    CONFIRME
+    ANNULE
+    HONORE
+  }
+  class Creneau {
+    <<record>>
+    +UUID id
+    +UUID medecinId
+    +Instant debut
+    +int dureeMinutes
+    +boolean disponible
+    +reserver() Creneau
+    +liberer() Creneau
+  }
+  class RendezVousRepository {
+    <<interface, port>>
+    +creneauEstLibre(medecinId, debut) boolean
+    +enregistrer(rdv) RendezVous
+    +parId(id) Optional~RendezVous~
+    +parPatient(patientId) List~RendezVous~
+    +parMedecin(medecinId) List~RendezVous~
+    +confirmesSansRappelEntre(de, a) List~RendezVous~
+  }
+  class CreneauRepository {
+    <<interface, port>>
+    +disponiblesPour(medecinId) List~Creneau~
+    +parId(id) Optional~Creneau~
+    +enregistrer(creneau) Creneau
+  }
+  class RendezVousService {
+    <<service>>
+    +reserver(patientId, medecinId, debut) RendezVous
+    +reserverCreneau(patientId, creneauId) RendezVous
+    +mesRendezVous(patientId) List~RendezVous~
+    +annuler(patientId, rendezVousId) RendezVous
+    +agendaDuMedecin(medecinId) List~RendezVous~
+    +honorer(medecinId, rendezVousId) RendezVous
+    +parId(rendezVousId) RendezVous
+    +annulerParCabinet(medecinId, rendezVousId) RendezVous
+  }
+  class CreneauService {
+    <<service>>
+    +DUREE_MIN_MINUTES = 5
+    +DUREE_MAX_MINUTES = 120
+    +disponiblesPour(medecinId) List~Creneau~
+    +ouvrir(medecinId, debut, dureeMinutes) Creneau
+  }
+  class Notifieur {
+    <<interface, port>>
+    +notifier(destinataireId, sujet, message)
+  }
+  class AlerteCreneau {
+    <<interface, port>>
+    +creneauLibere(medecinId, debut)
+  }
+  class JpaRendezVousRepository {
+    <<adaptateur JPA>>
+  }
+  class EnMemoireRendezVousRepository {
+    <<adaptateur mémoire>>
+  }
+
+  RendezVous --> StatutRdv : statut
+  RendezVous "0..1" --> "0..1" Creneau : creneauId (agenda)
+  RendezVousService --> RendezVousRepository
+  RendezVousService --> CreneauRepository
+  RendezVousService --> Notifieur
+  RendezVousService --> AlerteCreneau
+  CreneauService --> CreneauRepository
+  CreneauService --> AlerteCreneau
+  RendezVousRepository ..> RendezVous
+  CreneauRepository ..> Creneau
+  JpaRendezVousRepository ..|> RendezVousRepository
+  EnMemoireRendezVousRepository ..|> RendezVousRepository

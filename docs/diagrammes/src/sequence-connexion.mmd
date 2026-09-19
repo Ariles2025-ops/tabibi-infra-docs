@@ -1,0 +1,26 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+sequenceDiagram
+  autonumber
+  actor U as Utilisateur
+  participant APP as Application cliente<br/>(Angular : angular-oauth2-oidc<br/>Flutter : flutter_appauth)
+  participant KC as Keycloak<br/>realm tabibi
+  participant API as API Spring Boot<br/>(resource server JWT)
+
+  U->>APP: Clic « Se connecter » (ou route protégée)
+  APP->>APP: Génère code_verifier et code_challenge (PKCE S256)
+  APP->>KC: GET /realms/tabibi/protocol/openid-connect/auth<br/>client_id=tabibi-web ou tabibi-mobile, response_type=code,<br/>redirect_uri, code_challenge, state
+  KC->>U: Page de connexion (mot de passe, OTP si activé)
+  U->>KC: Identifiants
+  KC-->>APP: Redirection redirect_uri?code=...&state=...
+  APP->>KC: POST /token (grant_type=authorization_code,<br/>code, code_verifier) : aucun secret client
+  KC-->>APP: access_token (JWT signé RS256, 5 min),<br/>refresh_token, id_token
+  Note over APP: Le JWT porte sub (identifiant de l'utilisateur)<br/>et realm_access.roles (PATIENT, MEDECIN, SECRETAIRE, ADMIN, PHARMACIE)
+
+  APP->>API: GET /api/moi<br/>Authorization: Bearer <access_token>
+  API->>KC: GET /protocol/openid-connect/certs (JWKS, mis en cache)
+  KC-->>API: Clés publiques du realm
+  API->>API: Vérifie signature, expiration, issuer (TABIBI_KEYCLOAK_ISSUER)
+  API->>API: KeycloakRoleConverter : realm_access.roles vers ROLE_*
+  API->>API: SecurityConfig (chemins) puis @PreAuthorize (rôle),<br/>puis règle de propriétaire dans le cas d'usage
+  API-->>APP: 200 { sujet, nom, roles } (ou 401 / 403)
+  Note over API: FiltreAudit journalise sujet, méthode, chemin, statut, IP tronquée

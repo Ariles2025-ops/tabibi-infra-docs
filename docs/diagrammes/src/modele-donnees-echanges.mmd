@@ -1,0 +1,50 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+erDiagram
+  notification {
+    uuid id PK
+    uuid destinataire_id "index (destinataire_id, cree_le)"
+    varchar canal "INTERNE, SMS, EMAIL"
+    varchar sujet
+    text message
+    boolean lue
+    timestamptz cree_le
+  }
+  conversation {
+    uuid id PK
+    uuid patient_id "unique (patient_id, medecin_id)"
+    uuid medecin_id "index"
+    timestamptz cree_le
+    timestamptz dernier_message_le
+  }
+  message {
+    uuid id PK
+    uuid conversation_id "index (conversation_id, envoye_le)"
+    uuid auteur_id
+    text contenu "2000 max"
+    timestamptz envoye_le
+    timestamptz lu_le
+  }
+  besoin_medicament {
+    uuid id PK
+    uuid patient_id "index"
+    varchar medicament "200 max"
+    varchar wilaya_code "index (wilaya_code, statut)"
+    varchar commune
+    varchar precision
+    varchar statut "OUVERT, CLOTURE"
+    timestamptz publie_le
+    timestamptz cloture_le
+  }
+  reponse_pharmacie {
+    uuid id PK
+    uuid besoin_id "unique (besoin_id, pharmacie_id)"
+    uuid pharmacie_id "sub Keycloak"
+    varchar nom_pharmacie
+    boolean disponible
+    int prix_da
+    varchar commentaire
+    timestamptz repondue_le
+  }
+
+  conversation ||--o{ message : "contient"
+  besoin_medicament ||--o{ reponse_pharmacie : "recoit"

@@ -1,0 +1,66 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class Avis {
+    <<record, immuable>>
+    +NOTE_MIN = 1, NOTE_MAX = 5
+    +LONGUEUR_MAX_COMMENTAIRE = 500
+    +UUID id
+    +UUID rendezVousId
+    +UUID patientId
+    +UUID medecinId
+    +int note
+    +String commentaire
+    +StatutAvis statut
+    +Instant deposeLe
+    +deposer(rendezVousId, patientId, medecinId, note, commentaire, quand)$ Avis
+    +signaler() Avis : PUBLIE vers SIGNALE
+    +masquer() Avis : vers MASQUE
+    +retablir() Avis : vers PUBLIE
+    +estPublie() boolean
+    +estDe(patientId) boolean
+    +concerne(medecinId) boolean
+  }
+  class StatutAvis {
+    <<enumeration>>
+    PUBLIE
+    SIGNALE
+    MASQUE
+  }
+  class SyntheseAvis {
+    <<record, vue publique anonymisée>>
+    +Double moyenne
+    +long nombre
+    +List~Avis~ avis
+    +de(avis)$ SyntheseAvis
+  }
+  class AvisRepository {
+    <<interface, port>>
+    +enregistrer(avis) Avis
+    +parId(id) Optional~Avis~
+    +parRendezVous(rendezVousId) Optional~Avis~
+    +parPatient(patientId) List~Avis~
+    +publiesPourMedecin(medecinId) List~Avis~
+    +parStatut(statut) List~Avis~
+    +tous() List~Avis~
+  }
+  class AvisService {
+    <<service>>
+    +deposer(patientId, rendezVousId, note, commentaire) Avis
+    +mesAvis(patientId) List~Avis~
+    +avisPublics(medecinId) SyntheseAvis
+    +signaler(medecinId, avisId) Avis
+    +lister(statut) List~Avis~
+    +masquer(avisId) Avis
+    +retablir(avisId) Avis
+  }
+  class RendezVousRepository {
+    <<port du module rendezvous>>
+  }
+
+  Avis --> StatutAvis : statut
+  SyntheseAvis o-- Avis : avis publiés seulement
+  AvisService --> AvisRepository
+  AvisService --> RendezVousRepository : rendez-vous HONORE du patient
+  AvisService ..> SyntheseAvis : avisPublics()
+  AvisRepository ..> Avis

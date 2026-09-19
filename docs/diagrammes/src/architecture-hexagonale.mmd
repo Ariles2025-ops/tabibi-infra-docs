@@ -1,0 +1,40 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+flowchart LR
+  subgraph entrants["Adaptateurs entrants (module/adapter)"]
+    direction TB
+    REST["Contrôleurs REST<br/>@RestController, @PreAuthorize<br/>vues JSON, codes HTTP"]
+    PLAN["PlanificateurRappels<br/>@Scheduled, toutes les heures"]
+    FILTRE["FiltreAudit<br/>filtre servlet, après Spring Security"]
+    ERR["GestionErreursApi (@RestControllerAdvice)<br/>traduit les exceptions métier en<br/>400 / 403 / 404 / 409, corps { erreur }"]
+  end
+
+  subgraph application["Application (module/application)"]
+    direction TB
+    SVC["Cas d'usage : services Spring<br/>RendezVousService, CreneauService,<br/>OrdonnanceService, TeleconsultationService,<br/>MessagerieService, AvisService, DawiniService,<br/>AdministrationService, CabinetService,<br/>ListeAttenteService, RappelService, AuditService..."]
+  end
+
+  subgraph domaine["Domaine (module/domain) : aucune dépendance à Spring"]
+    direction TB
+    ENT["Entités et valeurs immuables<br/>RendezVous, Creneau, Ordonnance, Teleconsultation,<br/>Conversation, Message, Avis, BesoinMedicament,<br/>CandidatureMedecin, Rattachement, Profil, EntreeAudit"]
+    REGLES["Règles et transitions d'état<br/>honorer(), annulerParCabinet(), consentir(), demarrer(),<br/>signaler(), cloturer(), valider()...<br/>exceptions : Introuvable, Invalide, TransitionInvalide, AccesRefuse"]
+    PORTS["Ports (interfaces)<br/>RendezVousRepository, CreneauRepository, OrdonnanceRepository,<br/>TeleconsultationRepository, AvisRepository, ProfilRepository...<br/>Notifieur, AlerteCreneau, AuditRepository"]
+  end
+
+  subgraph sortants["Adaptateurs sortants (module/adapter)"]
+    direction TB
+    JPA["JPA / Hibernate + PostgreSQL<br/>profil postgres, schéma Liquibase 001 à 016"]
+    MEM["En mémoire<br/>profil par défaut : dev et tests, sans base"]
+    NOTIF["NotifieurInterne<br/>boîte de réception (canal INTERNE)<br/>SMS / e-mail : adaptateur à brancher"]
+    LA["ListeAttenteService<br/>réalise le port AlerteCreneau"]
+  end
+
+  REST --> SVC
+  PLAN --> SVC
+  FILTRE --> SVC
+  SVC --> ENT
+  SVC --> REGLES
+  SVC --> PORTS
+  PORTS -. "réalisé par" .-> JPA
+  PORTS -. "réalisé par" .-> MEM
+  PORTS -. "réalisé par" .-> NOTIF
+  PORTS -. "réalisé par" .-> LA

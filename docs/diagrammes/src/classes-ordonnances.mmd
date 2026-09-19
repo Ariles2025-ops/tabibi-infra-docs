@@ -1,0 +1,74 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class Ordonnance {
+    <<record, immuable>>
+    +UUID id
+    +UUID medecinId
+    +UUID patientId
+    +UUID rendezVousId
+    +List~LigneOrdonnance~ lignes
+    +Instant emiseLe
+    +String codeVerification
+    +StatutOrdonnance statut
+    +emettre(medecinId, patientId, rendezVousId, lignes, code, emiseLe)$ Ordonnance
+    +estAccessiblePar(demandeurId) boolean
+    +estValide() boolean
+  }
+  class LigneOrdonnance {
+    <<record>>
+    +String medicament
+    +String posologie
+    +String duree
+  }
+  class StatutOrdonnance {
+    <<enumeration>>
+    EMISE
+    ANNULEE
+  }
+  class CodeVerification {
+    <<utilitaire>>
+    +LONGUEUR = 8
+    +ALPHABET sans O, 0, I, 1
+    +generer()$ String
+    +normaliser(code)$ String
+  }
+  class ResultatVerification {
+    <<record, sans donnée personnelle>>
+    +boolean valide
+    +Instant emiseLe
+    +StatutOrdonnance statut
+    +de(ordonnance)$ ResultatVerification
+  }
+  class OrdonnanceRepository {
+    <<interface, port>>
+    +enregistrer(ordonnance) Ordonnance
+    +parId(id) Optional~Ordonnance~
+    +parPatient(patientId) List~Ordonnance~
+    +parMedecin(medecinId) List~Ordonnance~
+    +parCode(codeVerification) Optional~Ordonnance~
+  }
+  class OrdonnanceService {
+    <<service>>
+    +emettre(medecinId, patientId, rendezVousId, lignes) Ordonnance
+    +mesOrdonnances(patientId) List~Ordonnance~
+    +ordonnancesDuMedecin(medecinId) List~Ordonnance~
+    +parIdPour(demandeurId, ordonnanceId) Ordonnance
+    +verifier(code) ResultatVerification
+  }
+  class JpaOrdonnanceRepository {
+    <<adaptateur JPA : lignes en JSON>>
+  }
+  class EnMemoireOrdonnanceRepository {
+    <<adaptateur mémoire>>
+  }
+
+  Ordonnance "1" *-- "1..*" LigneOrdonnance : lignes
+  Ordonnance --> StatutOrdonnance
+  ResultatVerification ..> Ordonnance : de()
+  OrdonnanceService --> OrdonnanceRepository
+  OrdonnanceService ..> CodeVerification : codeLibre()
+  OrdonnanceService ..> ResultatVerification : verifier()
+  OrdonnanceRepository ..> Ordonnance
+  JpaOrdonnanceRepository ..|> OrdonnanceRepository
+  EnMemoireOrdonnanceRepository ..|> OrdonnanceRepository

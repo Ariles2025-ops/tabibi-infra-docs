@@ -1,0 +1,75 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class Profil {
+    <<record, immuable>>
+    +UUID utilisateurId
+    +String nomComplet : 2 à 120
+    +String telephone : algérien, 0 + 8 à 9 chiffres
+    +LocalDate dateNaissance : passée, après 1900
+    +String wilayaCode : 4 max
+    +String langue : fr, ar, kab, en
+    +Instant misAJourLe
+    +renseigner(utilisateurId, demande, quand)$ Profil
+    +estDe(utilisateurId) boolean
+  }
+  class DemandeProfil {
+    <<record, saisie>>
+    +String nomComplet
+    +String telephone
+    +LocalDate dateNaissance
+    +String wilayaCode
+    +String langue
+  }
+  class ProfilRepository {
+    <<interface, port>>
+    +parUtilisateur(utilisateurId) Optional~Profil~
+    +enregistrer(profil) Profil : création ou remplacement
+  }
+  class ProfilService {
+    <<service>>
+    +monProfil(sujet) Optional~Profil~
+    +enregistrer(sujet, demande) Profil
+  }
+  class InscriptionAttente {
+    <<record, immuable>>
+    +UUID id
+    +UUID patientId
+    +UUID medecinId
+    +Instant inscritLe
+    +inscrire(patientId, medecinId, quand)$ InscriptionAttente
+    +estDe(patientId) boolean
+    +concerne(medecinId) boolean
+  }
+  class ListeAttenteRepository {
+    <<interface, port>>
+    +enregistrer(i) InscriptionAttente
+    +parId(id) Optional~InscriptionAttente~
+    +parPatientEtMedecin(patientId, medecinId) Optional~InscriptionAttente~
+    +parPatient(patientId) List~InscriptionAttente~
+    +parMedecin(medecinId) List~InscriptionAttente~
+    +supprimer(id)
+  }
+  class AlerteCreneau {
+    <<interface, port>>
+    +creneauLibere(medecinId, debut)
+  }
+  class ListeAttenteService {
+    <<service, réalise AlerteCreneau>>
+    +inscrire(patientId, medecinId) InscriptionAttente
+    +mesInscriptions(patientId) List~InscriptionAttente~
+    +retirer(patientId, inscriptionId)
+    +listeDuMedecin(medecinId) List~InscriptionAttente~
+    +creneauLibere(medecinId, debut) prévient chaque inscrit
+  }
+  class Notifieur {
+    <<port du module notifications>>
+  }
+
+  Profil ..> DemandeProfil : renseigner()
+  ProfilService --> ProfilRepository
+  ProfilRepository ..> Profil
+  ListeAttenteService ..|> AlerteCreneau
+  ListeAttenteService --> ListeAttenteRepository
+  ListeAttenteService --> Notifieur : « Creneau disponible »
+  ListeAttenteRepository ..> InscriptionAttente

@@ -1,0 +1,48 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+flowchart LR
+  subgraph acteurs[Acteurs]
+    direction TB
+    P[Patient]
+    M[Médecin]
+    S[Secrétaire]
+    PH[Pharmacie]
+    AD[Administrateur]
+  end
+
+  subgraph clients[Applications clientes]
+    direction TB
+    WEB["Navigateur<br/>Angular 18 (tabibi-web)<br/>tous les rôles"]
+    MOB["Application mobile<br/>Flutter 3 (tabibi-mobile)<br/>patients, Android et iOS"]
+  end
+
+  subgraph serveur["Serveur unique : Docker Compose (docker-compose.prod.yml)"]
+    direction LR
+    CADDY["Caddy 2<br/>reverse proxy<br/>TLS Let's Encrypt<br/>ports 80 et 443"]
+    STATIQUE["web<br/>Node : fichiers Angular et<br/>rendu côté serveur des pages publiques<br/>(appelle api.DOMAINE)"]
+    API["backend<br/>API Spring Boot 3.4 / Java 21<br/>(tabibi-backend)"]
+    KC["keycloak<br/>Keycloak 26, realm tabibi<br/>OIDC, rôles, MFA"]
+    PG[("postgres<br/>PostgreSQL 16<br/>bases tabibi et keycloak")]
+  end
+
+  subgraph externe["Service externe"]
+    JITSI["Jitsi Meet<br/>salles vidéo des téléconsultations<br/>(instance publique ou auto-hébergée)"]
+  end
+
+  P --> WEB
+  P --> MOB
+  M --> WEB
+  S --> WEB
+  PH --> WEB
+  AD --> WEB
+
+  WEB -- "HTTPS<br/>DOMAINE : pages<br/>api.DOMAINE : API (JWT)<br/>auth.DOMAINE : connexion" --> CADDY
+  MOB -- "HTTPS<br/>api.DOMAINE et auth.DOMAINE" --> CADDY
+
+  CADDY -- "DOMAINE" --> STATIQUE
+  CADDY -- "api.DOMAINE" --> API
+  CADDY -- "auth.DOMAINE" --> KC
+  API -- "JDBC, migrations Liquibase" --> PG
+  KC -- "JDBC (base keycloak)" --> PG
+  API -. "JWKS : clés de signature (réseau interne)" .-> KC
+  WEB -. "lien de salle, après consentement" .-> JITSI
+  MOB -. "lien de salle, après consentement" .-> JITSI

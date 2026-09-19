@@ -1,0 +1,27 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+erDiagram
+  utilisateur {
+    uuid id PK
+    varchar keycloak_id UK "table du socle (001), non utilisee par les modules"
+    varchar role
+    timestamptz cree_le
+  }
+  profil {
+    uuid utilisateur_id PK "sub Keycloak, tous roles"
+    varchar nom_complet "120 max"
+    varchar telephone "20 max"
+    date date_naissance
+    varchar wilaya_code
+    varchar langue "fr, ar, kab, en"
+    timestamptz mis_a_jour_le
+  }
+  journal_acces {
+    uuid id PK
+    uuid sujet "null si anonyme ; index (sujet, horodatage)"
+    varchar methode
+    varchar chemin "512 max, sans parametres"
+    integer statut
+    varchar adresse_ip "tronquee"
+    timestamptz horodatage "index"
+    bigint duree_ms
+  }

@@ -1,0 +1,102 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class Notification {
+    <<record, immuable>>
+    +UUID id
+    +UUID destinataireId
+    +CanalNotification canal
+    +String sujet
+    +String message
+    +boolean lue
+    +Instant creeLe
+    +interne(destinataireId, sujet, message, creeLe)$ Notification
+    +marquerLue() Notification
+    +estDestineeA(utilisateurId) boolean
+  }
+  class CanalNotification {
+    <<enumeration>>
+    INTERNE : réalisé
+    SMS : réservé
+    EMAIL : réservé
+  }
+  class Notifieur {
+    <<interface, port de sortie>>
+    +notifier(destinataireId, sujet, message)
+  }
+  class NotifieurInterne {
+    <<adaptateur, @Component>>
+    +notifier(destinataireId, sujet, message) dépose une Notification
+  }
+  class NotificationRepository {
+    <<interface, port>>
+    +enregistrer(n) Notification
+    +parId(id) Optional~Notification~
+    +parDestinataire(destinataireId) List~Notification~
+    +nombreNonLues(destinataireId) long
+  }
+  class NotificationService {
+    <<service>>
+    +mesNotifications(sujet) List~Notification~
+    +nombreNonLues(sujet) long
+    +marquerLue(sujet, notificationId) Notification
+    +marquerToutesLues(sujet) long
+  }
+  class EntreeAudit {
+    <<record, immuable>>
+    +UUID id
+    +UUID sujet : null si anonyme
+    +String methode
+    +String chemin : sans paramètres, 512 max
+    +int statut
+    +String adresseIp : tronquée
+    +Instant horodatage
+    +long dureeMs
+    +nouvelle(sujet, methode, chemin, statut, ip, quand, dureeMs)$ EntreeAudit
+    +anonyme() boolean
+  }
+  class AdresseIp {
+    <<utilitaire>>
+    +tronquer(adresse)$ String : IPv4 dernier octet, IPv6 64 bits
+  }
+  class AuditRepository {
+    <<interface, port>>
+    +enregistrer(e) EntreeAudit
+    +recents(limite) List~EntreeAudit~
+    +parSujet(sujet, limite) List~EntreeAudit~
+  }
+  class AuditService {
+    <<service>>
+    +LIMITE_MAX = 1000
+    +enregistrer(e) EntreeAudit
+    +recents(limite) List~EntreeAudit~
+    +parSujet(sujet, limite) List~EntreeAudit~
+    +borner(limite)$ int
+  }
+  class FiltreAudit {
+    <<adaptateur, OncePerRequestFilter>>
+    -Clock horloge
+    +doFilterInternal() trace chaque requête sous /api
+  }
+  class RappelService {
+    <<service, module rappels>>
+    +HORIZON = 24 h
+    -Clock horloge
+    +executer() int : rappels envoyés, une seule fois
+  }
+  class PlanificateurRappels {
+    <<adaptateur, @Scheduled cron 0 0 * * * *>>
+    +executer()
+  }
+
+  Notification --> CanalNotification : canal
+  NotifieurInterne ..|> Notifieur
+  NotifieurInterne --> NotificationRepository
+  NotificationService --> NotificationRepository
+  NotificationRepository ..> Notification
+  FiltreAudit --> AuditService
+  FiltreAudit ..> AdresseIp : tronquer()
+  AuditService --> AuditRepository
+  AuditRepository ..> EntreeAudit
+  PlanificateurRappels --> RappelService
+  RappelService --> Notifieur : « Rappel de rendez-vous »

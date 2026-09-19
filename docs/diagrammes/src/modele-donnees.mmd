@@ -1,0 +1,94 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+erDiagram
+  medecin {
+    uuid id PK "sub Keycloak du medecin"
+    varchar nom_complet
+    varchar specialite_slug "index avec wilaya_code"
+    varchar specialite_fr
+    varchar wilaya_code
+    varchar wilaya_fr
+    varchar ville
+  }
+  creneau {
+    uuid id PK
+    uuid medecin_id "index (medecin_id, debut)"
+    timestamptz debut
+    int duree_minutes
+    boolean disponible
+  }
+  rendez_vous {
+    uuid id PK
+    uuid patient_id "sub Keycloak"
+    uuid medecin_id "index (medecin_id, debut)"
+    timestamptz debut
+    varchar statut "CONFIRME, ANNULE, HONORE"
+    uuid creneau_id "null hors agenda (004)"
+    timestamptz rappel_envoye_le "null tant que non rappele (015)"
+  }
+  ordonnance {
+    uuid id PK
+    uuid medecin_id "index"
+    uuid patient_id "index"
+    uuid rendez_vous_id "facultatif"
+    text lignes_json
+    timestamptz emise_le
+    varchar code_verification UK
+    varchar statut "EMISE, ANNULEE"
+  }
+  teleconsultation {
+    uuid id PK
+    uuid rendez_vous_id "index"
+    uuid patient_id "index"
+    uuid medecin_id "index"
+    varchar salle_id UK
+    varchar statut "PLANIFIEE, EN_COURS, TERMINEE, ANNULEE"
+    timestamptz consentement_patient_le
+    timestamptz cree_le
+    timestamptz demarree_le
+    timestamptz terminee_le
+  }
+  avis {
+    uuid id PK
+    uuid rendez_vous_id UK "un avis par rendez-vous"
+    uuid patient_id "index"
+    uuid medecin_id "index (medecin_id, statut)"
+    int note "1 a 5"
+    varchar commentaire "500 max"
+    varchar statut "PUBLIE, SIGNALE, MASQUE"
+    timestamptz depose_le
+  }
+  candidature_medecin {
+    uuid id PK
+    uuid medecin_id "index"
+    varchar nom_complet
+    varchar specialite_slug
+    varchar wilaya_code
+    varchar numero_ordre
+    varchar telephone
+    varchar statut "index : EN_ATTENTE, VALIDEE, REFUSEE"
+    text motif_refus
+    timestamptz deposee_le
+    timestamptz traitee_le
+  }
+  liste_attente {
+    uuid id PK
+    uuid patient_id "unique (patient_id, medecin_id)"
+    uuid medecin_id "index"
+    timestamptz inscrit_le
+  }
+  rattachement_secretaire {
+    uuid id PK
+    uuid medecin_id "unique (medecin_id, secretaire_id)"
+    uuid secretaire_id "index"
+    timestamptz cree_le
+  }
+
+  medecin ||--o{ creneau : "ouvre"
+  medecin ||--o{ rendez_vous : "recoit"
+  creneau |o--o| rendez_vous : "reserve par"
+  rendez_vous ||--o| teleconsultation : "donne lieu a"
+  rendez_vous ||--o| avis : "note par"
+  rendez_vous |o--o{ ordonnance : "peut rattacher"
+  medecin ||--o{ liste_attente : "liste d'attente"
+  medecin ||--o{ rattachement_secretaire : "cabinet"
+  candidature_medecin |o--o| medecin : "publie a la validation"

@@ -1,0 +1,41 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+sequenceDiagram
+  autonumber
+  actor P as Patient
+  participant APP as Web ou mobile
+  participant API as API<br/>RendezVousController<br/>+ RendezVousService
+  participant CR as CreneauRepository
+  participant RR as RendezVousRepository
+  participant N as Notifieur
+  participant LA as AlerteCreneau<br/>(ListeAttenteService)
+
+  P->>APP: Choisit un créneau sur la fiche du médecin
+  APP->>API: POST /api/creneaux/{id}/reserver (JWT PATIENT)
+  API->>CR: parId(creneauId)
+  CR-->>API: Creneau (404 si absent)
+  alt créneau déjà pris
+    API-->>APP: 409 { erreur : « Ce creneau n'est plus disponible. » }
+  else créneau disponible
+    API->>CR: enregistrer(creneau.reserver())
+    API->>RR: enregistrer(RendezVous.confirmer(patient, medecin, debut, creneauId))
+    API->>N: notifier(patient, « Rendez-vous confirme »)
+    API->>N: notifier(medecin, « Nouveau rendez-vous »)
+    API-->>APP: 201 RendezVousVue (CONFIRME)
+  end
+
+  P->>APP: « Annuler » le rendez-vous
+  APP->>API: POST /api/rendezvous/{id}/annuler (JWT PATIENT)
+  API->>RR: parId(rendezVousId)
+  RR-->>API: RendezVous (404 si absent, 403 si autre patient)
+  alt déjà annulé
+    API-->>APP: 200, inchangé (idempotent : le créneau n'est pas libéré deux fois)
+  else confirmé
+    API->>API: rdv.annuler()
+    API->>CR: enregistrer(creneau.liberer())
+    API->>LA: creneauLibere(medecinId, debut)
+    LA->>N: notifier(chaque inscrit, « Creneau disponible »)
+    API->>RR: enregistrer(rdv)
+    API->>N: notifier(medecin, « Rendez-vous annule »)
+    API-->>APP: 200 RendezVousVue (ANNULE)
+  end
+  Note over API,LA: Même mécanique pour l'annulation par le cabinet<br/>(médecin ou secrétaire) : le patient est alors prévenu.

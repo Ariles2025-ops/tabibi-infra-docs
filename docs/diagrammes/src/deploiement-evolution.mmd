@@ -1,0 +1,34 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+flowchart LR
+  subgraph e1["Étape 1 : aujourd'hui, un VPS"]
+    direction TB
+    A1["Un serveur Docker Compose<br/>Caddy + web + backend + keycloak + postgres<br/>sauvegardes pg_dump quotidiennes"]
+  end
+  subgraph e2["Étape 2 : séparer la donnée"]
+    direction TB
+    B1["Serveur applicatif<br/>Caddy + web + backend + keycloak"]
+    B2[("PostgreSQL managé<br/>ou second serveur dédié<br/>sauvegardes et réplication gérées")]
+    B1 -- "SPRING_DATASOURCE_URL<br/>KC_DB_URL" --> B2
+  end
+  subgraph e3["Étape 3 : plusieurs instances"]
+    direction TB
+    C0["Répartiteur de charge<br/>(Caddy, HAProxy ou celui de l'hébergeur)"]
+    C1["backend x N<br/>image identique, sans état<br/>TABIBI_RAPPELS_ACTIFS=true sur une seule instance"]
+    C2["web x N<br/>statique"]
+    C3["Keycloak x N<br/>cache distribué"]
+    C4[("PostgreSQL managé<br/>haute disponibilité")]
+    C5[("Stockage objet<br/>sauvegardes chiffrées")]
+    C0 --> C1
+    C0 --> C2
+    C0 --> C3
+    C1 --> C4
+    C3 --> C4
+    C4 -.-> C5
+  end
+  subgraph e4["Étape 4 : orchestrateur (si nécessaire)"]
+    direction TB
+    D1["Kubernetes managé ou Docker Swarm<br/>les mêmes images GHCR,<br/>la même configuration par variables d'environnement"]
+  end
+  e1 -- "quand la base devient critique" --> e2
+  e2 -- "quand une instance ne suffit plus" --> e3
+  e3 -- "quand l'équipe le justifie" --> e4

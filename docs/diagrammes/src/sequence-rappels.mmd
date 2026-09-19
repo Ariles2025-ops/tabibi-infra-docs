@@ -1,0 +1,29 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+sequenceDiagram
+  autonumber
+  participant PL as PlanificateurRappels<br/>@Scheduled cron 0 0 * * * *<br/>(tabibi.rappels.actifs = true)
+  participant ADM as Administrateur<br/>POST /api/admin/rappels/executer
+  participant SVC as RappelService
+  participant CLK as Clock (HorlogeConfig, UTC)
+  participant RR as RendezVousRepository
+  participant N as Notifieur
+  actor P as Patient
+
+  par toutes les heures
+    PL->>SVC: executer()
+  and à la demande
+    ADM->>SVC: executer()
+  end
+  SVC->>CLK: instant()
+  CLK-->>SVC: maintenant
+  SVC->>RR: confirmesSansRappelEntre(maintenant, maintenant + 24 h)
+  RR-->>SVC: rendez-vous CONFIRME, rappelEnvoyeLe = null, début dans [maintenant, +24 h[
+  loop pour chaque rendez-vous
+    SVC->>N: notifier(patientId, « Rappel de rendez-vous », « Votre rendez-vous du ... est demain. »)
+    N-->>P: notification interne (boîte de réception, cloche)
+    SVC->>SVC: rdv.marquerRappelEnvoye(maintenant)
+    SVC->>RR: enregistrer(rdv)
+  end
+  SVC-->>PL: nombre de rappels envoyés (journalisé, sans donnée personnelle)
+  SVC-->>ADM: 200 { nombre }
+  Note over SVC,RR: Un seul rappel par rendez-vous : une seconde exécution n'envoie rien.<br/>Annulés, honorés, passés ou au-delà de 24 h : ignorés.

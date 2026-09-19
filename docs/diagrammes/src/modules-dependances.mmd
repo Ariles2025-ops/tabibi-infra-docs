@@ -1,0 +1,38 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+flowchart TB
+  %% Les flèches pleines vers notifications passent toutes par le port Notifieur (non répété).
+  cabinet[cabinet]
+  teleconsultation[teleconsultation]
+  messagerie[messagerie]
+  avis[avis]
+  rappels[rappels]
+  administration[administration]
+  dawini[dawini]
+  audit[audit]
+  rendezvous["rendezvous<br/>(port RendezVousRepository)"]
+  creneaux[creneaux]
+  listeattente[listeattente]
+  annuaire[annuaire]
+  notifications["notifications<br/>(port Notifieur)"]
+  config["config<br/>(bean Clock)"]
+
+  cabinet -- "RendezVousService" --> rendezvous
+  cabinet -- "CreneauService" --> creneaux
+  cabinet --> notifications
+  teleconsultation --> rendezvous
+  teleconsultation --> notifications
+  messagerie --> rendezvous
+  messagerie --> notifications
+  avis --> rendezvous
+  rappels --> rendezvous
+  rappels --> notifications
+  rappels --> config
+  audit --> config
+  administration -- "MedecinRepository" --> annuaire
+  administration --> notifications
+  dawini --> notifications
+  rendezvous -- "CreneauRepository" --> creneaux
+  rendezvous --> notifications
+  rendezvous -- "AlerteCreneau" --> listeattente
+  creneaux -- "AlerteCreneau" --> listeattente
+  listeattente --> notifications

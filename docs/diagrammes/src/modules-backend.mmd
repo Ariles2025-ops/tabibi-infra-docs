@@ -1,0 +1,43 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+flowchart LR
+  subgraph transverse["Transverse"]
+    direction TB
+    commun["commun<br/>GestionErreursApi, AccesRefuseException,<br/>TransitionInvalideException, FormatDate"]
+    config["config<br/>SecurityConfig, KeycloakRoleConverter, CorsProprietes,<br/>HorlogeConfig (Clock), PlanificationConfig"]
+  end
+
+  subgraph exploitation["Exploitation"]
+    direction TB
+    rappels["rappels<br/>RappelService, PlanificateurRappels<br/>rappel 24 h avant"]
+    audit["audit<br/>EntreeAudit, AdresseIp, FiltreAudit<br/>journal des accès"]
+  end
+
+  subgraph organisation["Comptes et organisation"]
+    direction TB
+    identite["identite<br/>MoiController : GET /api/moi"]
+    profil["profil<br/>Profil, DemandeProfil"]
+    administration["administration<br/>CandidatureMedecin<br/>validation, statistiques"]
+    cabinet["cabinet<br/>Rattachement<br/>secrétaires d'un médecin"]
+  end
+
+  subgraph echanges["Échanges entre acteurs"]
+    direction TB
+    notifications["notifications<br/>Notification, port Notifieur<br/>boîte de réception"]
+    messagerie["messagerie<br/>Conversation, Message<br/>patient - médecin"]
+    avis["avis<br/>Avis, SyntheseAvis<br/>avis vérifiés, modération"]
+    listeattente["listeattente<br/>InscriptionAttente<br/>port AlerteCreneau"]
+    dawini["dawini<br/>BesoinMedicament, ReponsePharmacie<br/>patients - pharmacies"]
+  end
+
+  subgraph soins["Actes de soin"]
+    direction TB
+    ordonnances["ordonnances<br/>Ordonnance, LigneOrdonnance<br/>code de vérification public"]
+    teleconsultation["teleconsultation<br/>Teleconsultation, GenerateurSalle<br/>consentement, salle Jitsi"]
+  end
+
+  subgraph noyau["Noyau : annuaire et agenda"]
+    direction TB
+    annuaire["annuaire<br/>Medecin, CritereRecherche<br/>recherche publique, fiche"]
+    creneaux["creneaux<br/>Creneau<br/>disponibilités, ouverture"]
+    rendezvous["rendezvous<br/>RendezVous, StatutRdv<br/>réserver, annuler, honorer, agenda"]
+  end

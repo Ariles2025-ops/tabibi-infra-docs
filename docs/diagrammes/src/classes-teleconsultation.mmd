@@ -1,0 +1,70 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class Teleconsultation {
+    -UUID id
+    -UUID rendezVousId
+    -UUID patientId
+    -UUID medecinId
+    -String salleId
+    -StatutTeleconsultation statut
+    -Instant consentementPatientLe
+    -Instant creeLe
+    -Instant demarreeLe
+    -Instant termineeLe
+    +planifier(rendezVousId, patientId, medecinId, salleId)$ Teleconsultation
+    +consentir(quand) idempotent
+    +demarrer(quand) exige PLANIFIEE et consentement
+    +terminer(quand) exige EN_COURS
+    +annuler() exige PLANIFIEE
+    +appartientA(patientId) boolean
+    +estAvec(medecinId) boolean
+    +patientAConsenti() boolean
+    +peutAccederALaSalle(demandeurId) boolean
+  }
+  class StatutTeleconsultation {
+    <<enumeration>>
+    PLANIFIEE
+    EN_COURS
+    TERMINEE
+    ANNULEE
+  }
+  class GenerateurSalle {
+    <<domaine, bean via TeleconsultationConfig>>
+    +PREFIXE = "tabibi-"
+    +generer() String : 32 hexadécimaux SecureRandom
+  }
+  class TeleconsultationRepository {
+    <<interface, port>>
+    +enregistrer(t) Teleconsultation
+    +parId(id) Optional~Teleconsultation~
+    +parPatient(patientId) List~Teleconsultation~
+    +parMedecin(medecinId) List~Teleconsultation~
+    +parRendezVous(rendezVousId) Optional~Teleconsultation~
+  }
+  class TeleconsultationService {
+    <<service>>
+    -String baseUrl : tabibi.teleconsultation.base-url
+    +planifier(medecinId, rendezVousId) Teleconsultation
+    +mesTeleconsultations(patientId) List~Teleconsultation~
+    +teleconsultationsDuMedecin(medecinId) List~Teleconsultation~
+    +detail(sujet, id) Teleconsultation
+    +consentir(patientId, id) Teleconsultation
+    +demarrer(medecinId, id) Teleconsultation
+    +terminer(medecinId, id) Teleconsultation
+    +annuler(medecinId, id) Teleconsultation
+    +lienSalle(t, demandeurId) String ou null
+  }
+  class RendezVousRepository {
+    <<port du module rendezvous>>
+  }
+  class Notifieur {
+    <<port du module notifications>>
+  }
+
+  Teleconsultation --> StatutTeleconsultation : statut
+  TeleconsultationService --> TeleconsultationRepository
+  TeleconsultationService --> RendezVousRepository : rendez-vous CONFIRME du médecin
+  TeleconsultationService --> Notifieur : proposée, démarrée
+  TeleconsultationService --> GenerateurSalle
+  TeleconsultationRepository ..> Teleconsultation

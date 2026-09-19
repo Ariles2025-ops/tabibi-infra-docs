@@ -1,0 +1,86 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class BesoinMedicament {
+    <<record, immuable>>
+    +UUID id
+    +UUID patientId
+    +String medicament : 200 max
+    +String wilayaCode : 4 max
+    +String commune : 120 max
+    +String precision : 500 max
+    +StatutBesoin statut
+    +Instant publieLe
+    +Instant clotureLe
+    +publier(patientId, demande, quand)$ BesoinMedicament
+    +cloturer(quand) BesoinMedicament
+    +estOuvert() boolean
+    +estDe(patientId) boolean
+  }
+  class DemandeBesoin {
+    <<record, saisie du patient>>
+    +String medicament
+    +String wilayaCode
+    +String commune
+    +String precision
+  }
+  class StatutBesoin {
+    <<enumeration>>
+    OUVERT
+    CLOTURE
+  }
+  class ReponsePharmacie {
+    <<record, immuable>>
+    +UUID id
+    +UUID besoinId
+    +UUID pharmacieId
+    +String nomPharmacie : 160 max
+    +boolean disponible
+    +Integer prixDa : positif ou nul
+    +String commentaire : 500 max
+    +Instant repondueLe
+    +repondre(besoinId, pharmacieId, demande, quand)$ ReponsePharmacie
+  }
+  class DemandeReponse {
+    <<record, saisie de la pharmacie>>
+    +String nomPharmacie
+    +Boolean disponible
+    +Integer prixDa
+    +String commentaire
+  }
+  class BesoinRepository {
+    <<interface, port>>
+    +enregistrer(besoin) BesoinMedicament
+    +parId(id) Optional~BesoinMedicament~
+    +parPatient(patientId) List~BesoinMedicament~
+    +ouvertsParWilaya(wilayaCode) List~BesoinMedicament~
+  }
+  class ReponseRepository {
+    <<interface, port>>
+    +enregistrer(reponse) ReponsePharmacie
+    +parBesoin(besoinId) List~ReponsePharmacie~
+    +parBesoinEtPharmacie(besoinId, pharmacieId) Optional~ReponsePharmacie~
+    +compterParBesoin(besoinId) long
+  }
+  class DawiniService {
+    <<service>>
+    +publier(patientId, demande) BesoinMedicament
+    +mesBesoins(patientId) List~BesoinMedicament~
+    +cloturer(patientId, besoinId) BesoinMedicament
+    +besoinsOuverts(wilayaCode) List~BesoinMedicament~
+    +repondre(pharmacieId, besoinId, demande) ReponsePharmacie
+    +reponsesPourPatient(patientId, besoinId) List~ReponsePharmacie~
+    +reponsesPourPharmacie(besoinId) List~ReponsePharmacie~
+    +nombreReponses(besoinId) long
+  }
+  class Notifieur {
+    <<port du module notifications>>
+  }
+
+  BesoinMedicament --> StatutBesoin : statut
+  BesoinMedicament ..> DemandeBesoin : publier()
+  ReponsePharmacie ..> DemandeReponse : repondre()
+  BesoinMedicament "1" o-- "0..*" ReponsePharmacie : besoinId, une par pharmacie
+  DawiniService --> BesoinRepository
+  DawiniService --> ReponseRepository
+  DawiniService --> Notifieur : réponse d'une pharmacie, sans détail

@@ -1,0 +1,64 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+classDiagram
+  direction LR
+  class Conversation {
+    <<record, immuable>>
+    +UUID id
+    +UUID patientId
+    +UUID medecinId
+    +Instant creeLe
+    +Instant dernierMessageLe
+    +ouvrir(patientId, medecinId, quand)$ Conversation
+    +avecDernierMessageLe(quand) Conversation
+    +participe(utilisateurId) boolean
+    +autreParticipant(utilisateurId) UUID
+  }
+  class Message {
+    <<record, immuable>>
+    +LONGUEUR_MAX = 2000
+    +UUID id
+    +UUID conversationId
+    +UUID auteurId
+    +String contenu
+    +Instant envoyeLe
+    +Instant luLe
+    +envoyer(conversationId, auteurId, contenu, quand)$ Message
+    +marquerLu(quand) Message
+    +estLu() boolean
+    +estDe(utilisateurId) boolean
+  }
+  class ConversationRepository {
+    <<interface, port>>
+    +enregistrer(c) Conversation
+    +parId(id) Optional~Conversation~
+    +parParticipants(patientId, medecinId) Optional~Conversation~
+    +parParticipant(utilisateurId) List~Conversation~
+  }
+  class MessageRepository {
+    <<interface, port>>
+    +enregistrer(m) Message
+    +parConversation(conversationId) List~Message~
+    +nonLus(conversationId, lecteurId) long
+    +marquerLus(conversationId, lecteurId, quand) List~Message~
+  }
+  class MessagerieService {
+    <<service>>
+    +ouvrir(patientId, medecinId) ResultatOuverture
+    +mesConversations(sujet) List~ConversationAvecNonLus~
+    +messages(sujet, conversationId) List~Message~
+    +envoyer(sujet, conversationId, contenu) Message
+  }
+  class RendezVousRepository {
+    <<port du module rendezvous>>
+  }
+  class Notifieur {
+    <<port du module notifications>>
+  }
+
+  Conversation "1" o-- "0..*" Message : conversationId
+  MessagerieService --> ConversationRepository
+  MessagerieService --> MessageRepository
+  MessagerieService --> RendezVousRepository : un rendez-vous commun est exigé
+  MessagerieService --> Notifieur : « Nouveau message », jamais le contenu
+  ConversationRepository ..> Conversation
+  MessageRepository ..> Message

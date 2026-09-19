@@ -1,0 +1,42 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+flowchart LR
+  subgraph github["GitHub : organisation Tabibi"]
+    direction TB
+    REPO_B["tabibi-backend<br/>push sur main"]
+    REPO_W["tabibi-web<br/>push sur main"]
+    CI_B["GitHub Actions ci.yml<br/>mvn verify, puis image Docker"]
+    CI_W["GitHub Actions ci.yml<br/>npm ci, ng build, ng test,<br/>puis image Docker"]
+    GHCR[("GHCR<br/>ghcr.io/ORG/tabibi-backend:latest, sha-xxxx<br/>ghcr.io/ORG/tabibi-web:latest")]
+    REPO_B --> CI_B --> GHCR
+    REPO_W --> CI_W --> GHCR
+  end
+
+  subgraph vps["VPS unique (2 vCPU, 4 Go) : Docker Compose, docker-compose.prod.yml"]
+    direction TB
+    CADDY["caddy (caddy:2-alpine)<br/>ports 80, 443, 443/udp<br/>TLS Let's Encrypt, HSTS, nosniff"]
+    WEB["web<br/>ghcr.io/ORG/tabibi-web<br/>Node : rendu côté serveur + fichiers Angular<br/>assets/config.json écrit au démarrage"]
+    BACK["backend<br/>ghcr.io/ORG/tabibi-backend<br/>SPRING_PROFILES_ACTIVE=postgres<br/>healthcheck /actuator/health"]
+    KC["keycloak (quay.io/keycloak/keycloak:26.0)<br/>start --import-realm<br/>realm de production généré"]
+    PG[("postgres (postgres:16-alpine)<br/>bases tabibi et keycloak<br/>healthcheck pg_isready")]
+    VOL_PG[("volume tabibi-pg")]
+    VOL_CADDY[("volumes caddy-data, caddy-config<br/>certificats")]
+    ENV[".env (jamais commité)<br/>DOMAINE, ACME_EMAIL, ORG_GITHUB,<br/>mots de passe, tags d'images"]
+    CRON["cron 03:00 : infra/sauvegarde/pg_dump.sh<br/>/var/backups/tabibi, rotation 14 jours"]
+    CADDY -- "DOMAINE" --> WEB
+    CADDY -- "api.DOMAINE" --> BACK
+    CADDY -- "auth.DOMAINE" --> KC
+    BACK -- "JDBC" --> PG
+    KC -- "JDBC" --> PG
+    BACK -. "JWKS interne<br/>keycloak:8080" .-> KC
+    PG --- VOL_PG
+    CADDY --- VOL_CADDY
+    CRON -. "pg_dump" .-> PG
+  end
+
+  DNS["DNS : DOMAINE, api.DOMAINE, auth.DOMAINE<br/>vers l'adresse IP du VPS"]
+  HORS["Copie chiffrée des sauvegardes<br/>hors du serveur"]
+
+  GHCR -- "docker compose pull" --> BACK
+  GHCR -- "docker compose pull" --> WEB
+  DNS --> CADDY
+  CRON -.-> HORS

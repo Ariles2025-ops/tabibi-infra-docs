@@ -1,0 +1,37 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+sequenceDiagram
+  autonumber
+  actor P as Patient
+  actor PH as Pharmacie
+  participant APP as Web ou mobile (patient)<br/>web (pharmacie)
+  participant API as API<br/>DawiniController<br/>+ DawiniService
+  participant DB as Ports de persistance<br/>BesoinRepository<br/>ReponseRepository
+  participant N as Notifieur
+
+  P->>APP: « Demander un médicament »<br/>(médicament, wilaya, commune, précision)
+  APP->>API: POST /api/dawini/besoins (JWT PATIENT)
+  API->>API: BesoinMedicament.publier() :<br/>obligatoires, longueurs bornées
+  API->>DB: enregistrer(besoin OUVERT)
+  API-->>APP: 201 BesoinVue (400 si invalide)
+
+  PH->>APP: Espace pharmacie : choisit sa wilaya
+  APP->>API: GET /api/dawini/besoins?wilaya=16 (JWT PHARMACIE)
+  API->>DB: ouvertsParWilaya(wilayaCode)
+  API-->>APP: 200 besoins ouverts, sans patientId<br/>(jamais exposé aux pharmacies)
+
+  PH->>APP: Répond : nom de la pharmacie, disponible,<br/>prix en DA, commentaire
+  APP->>API: POST /api/dawini/besoins/{id}/reponses
+  API->>DB: parId(besoinId) : 404 inconnu, 409 clôturé
+  API->>DB: parBesoinEtPharmacie() : 409 si déjà répondu
+  API->>DB: enregistrer(ReponsePharmacie.repondre(...))
+  API->>N: notifier(patient, « Reponse d'une pharmacie », sans détail)
+  API-->>APP: 201 ReponseVue
+
+  P->>APP: Ouvre les réponses de sa demande
+  APP->>API: GET /api/dawini/besoins/{id}/reponses (JWT PATIENT)
+  API->>DB: parBesoin(besoinId) : 403 si la demande est à un autre patient
+  API-->>APP: 200 réponses, les plus anciennes d'abord
+  P->>APP: « Clôturer la demande »
+  APP->>API: POST /api/dawini/besoins/{id}/cloturer
+  API->>DB: enregistrer(besoin.cloturer(maintenant)) : 409 si déjà clôturé
+  API-->>APP: 200 BesoinVue (CLOTURE) : plus proposé aux pharmacies

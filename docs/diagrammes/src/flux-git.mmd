@@ -1,0 +1,24 @@
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#e6f4ef','primaryBorderColor':'#0f7a5f','primaryTextColor':'#0b3d2e','lineColor':'#0f7a5f','fontFamily':'Helvetica'}}}%%
+flowchart TB
+  subgraph org["Organisation GitHub Tabibi : quatre dépôts, branche principale protégée (pas de push direct)"]
+    direction LR
+    R1["tabibi-backend<br/>API Spring Boot<br/>CI : mvn verify + image GHCR"]
+    R2["tabibi-web<br/>Angular 18<br/>CI : npm ci, ng build, ng test"]
+    R3["tabibi-mobile<br/>Flutter 3<br/>CI : analyze, test, APK debug"]
+    R4["tabibi-infra-docs<br/>documentation, compose dev,<br/>realm Keycloak, diagrammes"]
+    R1 ~~~ R2 ~~~ R3 ~~~ R4
+  end
+
+  subgraph cycle["Cycle d'une fonctionnalité, identique dans chaque dépôt"]
+    direction LR
+    B["1. Branche<br/>feat/scope-sujet"]
+    C["2. Un commit conventionnel<br/>feat(scope): ...<br/>code + tests + README + JOURNAL"]
+    P["3. Pull request<br/>vers la branche principale"]
+    CI["4. CI verte obligatoire<br/>build + tests"]
+    REV["5. Revue"]
+    M["6. Squash and merge<br/>historique linéaire"]
+    D["7. Déploiement<br/>image GHCR latest et sha-xxxx<br/>docker compose pull et up"]
+    B --> C --> P --> CI --> REV --> M --> D
+  end
+
+  org --> cycle
