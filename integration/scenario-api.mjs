@@ -350,6 +350,23 @@ await etape('La verification publique de l\'ordonnance repond 200 (GET /api/ordo
   return `valide, statut ${resultat.statut} ; code inconnu -> 404`;
 });
 
+await etape("L'ordonnance imprimable est un vrai PDF (GET /api/ordonnances/{id}/pdf, backend >= v0.23.0)", async () => {
+  const reponse = await fetch(`${API}/api/ordonnances/${etat.ordonnance.id}/pdf`, {
+    headers: { Authorization: `Bearer ${jetons.patient}` },
+    signal: AbortSignal.timeout(30000),
+  });
+  if (reponse.status === 404) {
+    return 'endpoint absent de cette version de l\'API (anterieure a v0.23.0) : etape sautee';
+  }
+  verifier(reponse.status === 200, `statut ${reponse.status}`);
+  const type = reponse.headers.get('content-type') || '';
+  verifier(type.startsWith('application/pdf'), `content-type ${type}`);
+  const octets = Buffer.from(await reponse.arrayBuffer());
+  verifier(octets.subarray(0, 5).toString('latin1') === '%PDF-', 'le corps ne commence pas par %PDF-');
+  verifier(octets.length > 1000, `PDF trop petit : ${octets.length} octets`);
+  return `${octets.length} octets, ${type}`;
+});
+
 await etape('Un acces hors role est refuse : patient sur /api/admin/statistiques (403), administrateur accepte (200)', async () => {
   await appelAttendu('GET', '/api/admin/statistiques', 403, { jeton: jetons.patient });
   await appelAttendu('POST', '/api/medecin/creneaux', 403, {

@@ -240,7 +240,7 @@ migrée par Liquibase, accepte les jetons du vrai Keycloak et enchaîne les cas 
 | Fichier | Rôle |
 |---|---|
 | `integration/docker-compose.integration.yml` | `postgres:16-alpine`, `quay.io/keycloak/keycloak:26.0` (`start-dev --import-realm`, realm `../tabibi-backend/infra/keycloak/tabibi-realm.json` monté seul, `KC_HOSTNAME=http://localhost:8081`), API construite depuis `../tabibi-backend` (`build: context`, profil `postgres`, datasource `postgres:5432/tabibi`, émetteur `http://localhost:8081/realms/tabibi`, clés lues en interne sur `keycloak:8080`), ports 8080 et 8081 publiés, `healthcheck` sur chaque service |
-| `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 19 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec |
+| `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 20 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec |
 | `integration/lancer.sh` | `docker compose up -d --build`, attente de Keycloak et de l'API, scénario, journaux des conteneurs en cas d'échec, `down -v` |
 | `integration/verifier-web.sh` | contrôle du front web (image `tabibi-web`) lancé face à cette pile, avec `curl` seulement : `assets/config.json`, page `/` rendue côté serveur avec les praticiens de l'API, fiche `/medecins/<id>`, CSP |
 | `.github/workflows/integration.yml` | la CI qui enchaîne tout (voir plus bas) |
@@ -255,7 +255,8 @@ le créneau n'est plus proposé et une seconde réservation répond 409 `{ erreu
 notifications du patient (« Rendez-vous confirme ») et du médecin (« Nouveau rendez-vous ») ; le médecin honore ;
 avis (`POST /api/avis`, 201, sans identifiant du patient dans la vue) ; synthèse publique sans jeton (l'avis y est,
 anonyme) ; ordonnance (`POST /api/ordonnances`, 201) visible du patient ; vérification publique du code (200, 404 pour
-un code inconnu) ; refus 403 du patient sur `/api/admin/statistiques` et sur `POST /api/medecin/creneaux`, 200 pour
+un code inconnu) ; ordonnance imprimable (`GET /api/ordonnances/{id}/pdf`, backend v0.23.0 : `application/pdf`
+commençant par `%PDF-`, étape sautée si l'API est antérieure) ; refus 403 du patient sur `/api/admin/statistiques` et sur `POST /api/medecin/creneaux`, 200 pour
 l'administrateur.
 
 **Lancer.**
