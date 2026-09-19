@@ -26,7 +26,7 @@
 | JDK Temurin | 21 | backend |
 | Maven | 3.9 | backend (`mvn`) |
 | Node.js + npm | 20 | web |
-| Chrome ou Chromium | récent | tests Karma (`CHROME_BIN` si hors du `PATH`) |
+| Chrome ou Chromium | récent | facultatif : `CHROME_BIN` évite de télécharger le Chromium de Playwright (web et `integration/web`) |
 | Flutter SDK (canal stable) + Android Studio (SDK, émulateur) ; Xcode sur macOS | Flutter 3, Dart >= 3.5 | mobile |
 | Mermaid CLI (`npm install -g @mermaid-js/mermaid-cli`) | 11 | diagrammes de ce dépôt (facultatif) |
 
@@ -81,7 +81,7 @@ docker build -t tabibi-backend .                             # image de producti
   `TABIBI_RAPPELS_ACTIFS`, `SPRING_DATASOURCE_*` (voir le README du dépôt).
 - Structure : un module par domaine, `domain/` (entités, ports, exceptions), `application/` (services),
   `adapter/` (contrôleur, repositories mémoire et JPA) ; voir [ARCHITECTURE.md](ARCHITECTURE.md).
-- Tests (50 classes) : `src/test/java/dz/tabibi/backend/<module>/` : `*Test` sur le domaine (`AvisTest`,
+- Tests (63 classes) : `src/test/java/dz/tabibi/backend/<module>/` : `*Test` sur le domaine (`AvisTest`,
   `TeleconsultationTest`, `ProfilTest`...), `*ServiceTest` (cas d'usage avec faux ports), `*WebTest`
   (`@WebMvcTest` + `SecurityConfig` : 401 sans jeton, 403 par rôle, codes HTTP), `JpaRendezVousRepositoryIT`
   (Testcontainers, activé par `-Dit.docker=true`), `SecuriteWebTest` et `CorsWebTest` (chaîne de sécurité),
@@ -92,8 +92,11 @@ docker build -t tabibi-backend .                             # image de producti
 ```bash
 npm install
 npm start                                                    # ng serve, http://localhost:4200
-npx ng test --watch=false --browsers=ChromeHeadlessCI        # specs unitaires, Chrome headless sans bac à sable
-npm run e2e                                                  # Playwright : le build SSR face à une API simulée
+npm run build && npm test                                    # le build de production, puis les 296 tests Playwright
+npm test                                                     # les tests seuls (dist/ doit déjà exister)
+npm run test:logique                                         # 39 tests de modules purs, dans node, sans navigateur
+npm run test:navigateur                                      # 257 tests dans Chromium (dont 19 parcours)
+npm run test:ui                                              # mode interactif : rejouer un test, inspecter le DOM
 npx ng build                                                 # dist/tabibi-web/browser et server/server.mjs
 npm run serve:ssr                                            # http://localhost:4000 : build de production rendu côté serveur
 docker build -t tabibi-web . && docker run --rm -p 4200:80 -e TABIBI_API_URL=http://localhost:8080 \
@@ -111,8 +114,14 @@ mêmes traces à lire : un test écrit d'un côté se relit de l'autre.
   d'une minuterie : vérifier `isPlatformBrowser` avant d'en utiliser.
 - Structure : un dossier par domaine avec un `*.service.ts` (HTTP) et des composants standalone ; `auth/` (OIDC,
   intercepteur, rôles, gardes) ; routes dans `app.routes.ts`.
-- Tests : `*.spec.ts` à côté de chaque fichier ; services avec `HttpTestingController`, composants avec un service
-  factice ; `AppComponent` a un test de fumée de la barre de navigation par rôle.
+- Tests : **aucun `*.spec.ts` sous `src/`** ; tout vit dans `tests/`, en deux projets Playwright — `tests/logique/`
+  (modules sans import Angular : dictionnaires i18n, `*.formats.ts`) et `tests/navigateur/` + `tests/parcours/`
+  (composants, appels HTTP, gardes de rôle, SEO, i18n rendue, parcours). Les aides de `tests/outils/` remplacent
+  `TestBed` et `HttpTestingController` : `ouvrir` (attend l'hydratation), `connecter` (connexion simulée, rôles par
+  `GET /api/moi`), `stub` (réponse à la place de l'API), `requetes` (journal des appels). Règle de conversion :
+  chaque assertion doit avoir son équivalent **observable** à l'écran ou dans la requête envoyée.
+- Garde-fous : `npm run verif:tests` échoue s'il reste une spec sous `src/` ou une dépendance de l'ancien outillage ;
+  `npm run verif:i18n` refuse un libellé français littéral dans un template.
 
 ## 5. Mobile : `tabibi-mobile`
 
@@ -163,7 +172,7 @@ Exemple : « le patient peut noter la ponctualité d'un cabinet ». Suivre l'ord
 2. Composant standalone, formulaire avec validation côté client **identique aux règles du backend**, messages
    d'erreur lus dans `{ erreur }`, redirection vers la connexion si nécessaire, garde de rôle si l'espace est réservé.
 3. Route dans `app.routes.ts`, lien dans la barre de navigation (`AppComponent`) selon le rôle.
-4. Specs : service (`HttpTestingController`), composant (service factice), barre de navigation.
+4. Tests Playwright : la requête réellement envoyée (`requetes(page)`), l'écran et ses messages d'erreur, la garde de rôle (`connecter` avec un rôle insuffisant) ; une fonction pure va dans `*.formats.ts` et se teste dans le projet `logique`.
 5. README, `docs/JOURNAL.md`, commit `feat(<scope>-web): ...`.
 
 **Mobile** (si la fonctionnalité concerne les patients)
@@ -187,7 +196,7 @@ fonctionnalité, corps qui explique le *pourquoi* et liste les vérifications fa
 type(scope): description courte a l'infinitif ou au nom
 
 Pourquoi ce changement, ce qu'il apporte, les regles metier ajoutees,
-les fichiers ou modules touches, ce qui a ete verifie (mvn test, ng test, flutter test).
+les fichiers ou modules touches, ce qui a ete verifie (mvn test, npm test, flutter test).
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01CCa1DaNUmAZsjfJadZhwzF
@@ -216,8 +225,8 @@ et illustré ci-dessous.
   version et le hash : c'est la vue « produit » de l'avancement.
 - Quand on ajoute une fonctionnalité : nouvelle section dans le journal du dépôt concerné **dans le même commit**,
   puis une ligne dans le journal global de ce dépôt (commit `docs(journal): ...`).
-- Les numéros de version des journaux sont ceux du produit ; `pom.xml` (0.1.0) et `package.json` (0.1.0) n'ont pas
-  été incrémentés au fil des versions, seul `pubspec.yaml` (0.13.0+1) l'a été pour les stores.
+- Les numéros de version des journaux sont ceux du produit ; `pom.xml` (0.27.0), `package.json` du web (0.24.0) et
+  `pubspec.yaml` (0.15.0+1) suivent aujourd'hui le journal de leur dépôt.
 
 ## 9. Regénérer les diagrammes de ce dépôt
 
@@ -236,8 +245,8 @@ par idée (couper plutôt que densifier), vérifier le PNG après génération, 
 
 ## 10. Tests d'intégration des trois briques
 
-**Pourquoi.** Les tests des dépôts sont unitaires ou simulés (`@WebMvcTest` avec un jeton factice, specs Angular avec
-des services factices, `FakeApiService` sur mobile) : aucun ne prouve que l'API en conteneur, avec sa base PostgreSQL
+**Pourquoi.** Les tests des dépôts sont unitaires ou simulés (`@WebMvcTest` avec un jeton factice, Playwright du web
+devant une API simulée, `FakeApiService` sur mobile) : aucun ne prouve que l'API en conteneur, avec sa base PostgreSQL
 migrée par Liquibase, accepte les jetons du vrai Keycloak et enchaîne les cas d'usage de bout en bout. Le dossier
 `integration/` de ce dépôt le fait, avec les images et le realm de production, sans simulateur.
 
@@ -246,9 +255,9 @@ migrée par Liquibase, accepte les jetons du vrai Keycloak et enchaîne les cas 
 | Fichier | Rôle |
 |---|---|
 | `integration/docker-compose.integration.yml` | `postgres:16-alpine`, `quay.io/keycloak/keycloak:26.0` (`start-dev --import-realm`, realm `../tabibi-backend/infra/keycloak/tabibi-realm.json` monté seul, `KC_HOSTNAME=http://localhost:8081`), API construite depuis `../tabibi-backend` (`build: context`, profil `postgres`, datasource `postgres:5432/tabibi`, émetteur `http://localhost:8081/realms/tabibi`, clés lues en interne sur `keycloak:8080`), ports 8080 et 8081 publiés, `healthcheck` sur chaque service |
-| `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 20 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec |
-| `integration/lancer.sh` | `docker compose up -d --build`, attente de Keycloak et de l'API, scénario, journaux des conteneurs en cas d'échec, `down -v` |
-| `integration/verifier-web.sh` | lanceur mince des tests navigateur : dépendances (`npm ci`), Chromium de Playwright si besoin, puis `npx playwright test` |
+| `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 21 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec ; une étape dépose le résultat (médecin publié, rendez-vous, code de l'ordonnance) dans `FICHIER_RESULTAT`, sitôt l'ordonnance émise |
+| `integration/lancer.sh` | `docker compose up -d --build`, attente de Keycloak et de l'API, scénario, journaux des conteneurs en cas d'échec, `down -v` ; expose `FICHIER_RESULTAT` (défaut `integration/resultat-scenario.json`), affiche son chemin avec `GARDER_LA_PILE=1` et l'efface quand la pile est détruite |
+| `integration/verifier-web.sh` | lanceur mince des tests navigateur : lecture du résultat du scénario (`CODE_ORDONNANCE`), dépendances (`npm ci`), Chromium de Playwright si besoin, puis `npx playwright test` |
 | `integration/web/` | les tests eux-mêmes : `package.json` (`@playwright/test` seul), `playwright.config.ts` (projet `chromium`, `baseURL` = `URL_WEB`, trace / capture / vidéo conservées en cas d'échec, **pas de `webServer`** : la pile est déjà lancée), `tests/outils.ts` (`ouvrir()` qui attend l'hydratation, `lireApi()` / `praticiens()` qui interrogent l'API réelle, `htmlRendu()` qui relit le HTML sans navigateur), `tests/pile-reelle.spec.ts` (10 tests) |
 | `.github/workflows/integration.yml` | la CI qui enchaîne tout (voir plus bas) |
 
@@ -331,8 +340,12 @@ du site annonce la fiche du premier praticien ; la CSP autorise l'origine de l'A
 page en arabe (`dir="rtl"`, `lang="ar"`, titre arabe).
 
 Variables : `URL_WEB` (`http://localhost:4200`), `URL_API` (`http://localhost:8080`), `ISSUER_KEYCLOAK`
-(`http://localhost:8081/realms/tabibi`), `CHROME_BIN`, et `CODE_ORDONNANCE` — le code d'une ordonnance réellement
-émise par `scenario-api.mjs`. Sans lui, le cas du code **valide** de `/verifier` est sauté (`test.skip` avec le motif
+(`http://localhost:8081/realms/tabibi`), `CHROME_BIN`, `FICHIER_RESULTAT` et `CODE_ORDONNANCE` — le code d'une
+ordonnance réellement émise par `scenario-api.mjs`. **Il n'y a rien à fournir à la main** : le scénario dépose son
+résultat (`{ medecinId, rendezVousId, ordonnanceId, codeOrdonnance, genereLe }`) dans `FICHIER_RESULTAT`
+(défaut `integration/resultat-scenario.json`, jamais commité) et `verifier-web.sh` l'y lit avant d'appeler
+Playwright ; une valeur déjà présente dans l'environnement l'emporte. Sans ce fichier ni cette variable — par exemple
+en lançant les tests navigateur seuls — le cas du code **valide** de `/verifier` est sauté (`test.skip` avec le motif
 affiché) ; le cas du code inconnu, lui, est toujours vérifié. Les anciens noms `TABIBI_WEB_URL`, `TABIBI_API_URL` et
 `TABIBI_KEYCLOAK_ISSUER` restent acceptés.
 

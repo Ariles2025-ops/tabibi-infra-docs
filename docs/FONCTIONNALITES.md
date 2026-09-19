@@ -100,17 +100,17 @@ est réservée aux patients), **API seulement** (aucun écran ne l'expose encore
 
 | Niveau | Où | Ce qui est prouvé |
 |---|---|---|
-| Unitaire et tranche web, backend | `tabibi-backend`, `mvn test` (54 classes) : domaine, services avec faux ports, `@WebMvcTest` avec `SecurityConfig` | règles métier, transitions, 401 / 403 par rôle, codes HTTP ; `RealmKeycloakTest` : le realm versionné est conforme |
+| Unitaire et tranche, backend | `tabibi-backend`, `mvn test` (63 classes) : domaine, services avec faux ports, `@WebMvcTest` avec `SecurityConfig` | règles métier, transitions, 401 / 403 par rôle, codes HTTP ; `RealmKeycloakTest` : le realm versionné est conforme |
 | Scénario de bout en bout, backend | `ScenarioApiTest` (`@SpringBootTest`, adaptateurs en mémoire, `JwtDecoder` simulé, backend v0.24.1) | application complète sans base : parcours créneau, réservation, notifications, honoré, avis, ordonnance, vérification, PDF réel, 429 |
 | Intégration base, backend | `mvn verify -Dit.docker=true` (Testcontainers PostgreSQL) | requêtes JPA non triviales sur un vrai PostgreSQL |
-| Specs, web | `tabibi-web`, `ng test` (286 specs) : services avec `HttpTestingController`, composants avec services factices | écrans, formulaires, gardes de rôle, configuration, garde-fous du rendu serveur |
-| Bout en bout navigateur, web | `npm run e2e` (Playwright, 16 tests, web v0.21.0) sur le build de production servi par `server.ts` face à une API simulée | pages publiques rendues et hydratées, 404, `robots.txt`, `sitemap.xml`, titres, redirection vers la connexion |
+| Modules purs, web | `tabibi-web`, `npm run test:logique` (Playwright, projet `logique` : 39 tests dans node, sans navigateur) | dictionnaires i18n complets, formatage, validation et bornes des `*.formats.ts`, configuration lue à l'exécution |
+| Navigateur, web | `tabibi-web`, `npm run test:navigateur` (Playwright, projet `navigateur` : 257 tests dans Chromium dont 19 parcours, web v0.24.0) sur le build de production servi par `server.ts` face à une API simulée | écrans, formulaires, appels HTTP réellement envoyés, gardes de rôle, 400 / 403 / 404 / 409, SEO et `sitemap.xml`, i18n rendue et `dir=rtl`, parcours de bout en bout |
 | Tests, mobile | `tabibi-mobile`, `flutter test` : modèles, utilitaires, pages avec `FakeApiService` | écrans patient, tolérance des modèles |
 | **Intégration réelle des trois briques** | `tabibi-infra-docs`, `integration/lancer.sh` puis `verifier-web.sh` ; workflow `integration` (push, pull request, hebdomadaire) | API construite depuis les sources en profil `postgres` (Liquibase sur PostgreSQL 16), jetons du vrai Keycloak 26 acceptés avec les rôles, parcours complet (créneau, candidature validée, annuaire, réservation 201 / 409, notifications, honoré, avis et synthèse publique, ordonnance, vérification publique et PDF, 401 / 403), image web dont le rendu serveur appelle la vraie API (`/`, fiche, `config.json`, CSP) |
 
-Pas encore : navigateur contre l'API réelle (Playwright tourne sur une API simulée) et connexion OIDC réelle,
-application mobile contre l'API réelle, charge, restauration d'une sauvegarde (voir [DEPLOIEMENT.md](DEPLOIEMENT.md),
-section 16).
+Pas encore : connexion OIDC réelle menée jusqu'au bout dans le navigateur (la pile réelle vérifie le départ vers
+Keycloak, pas l'authentification d'un compte), application mobile contre l'API réelle, charge, restauration d'une
+sauvegarde (voir [DEPLOIEMENT.md](DEPLOIEMENT.md), section 16).
 
 ## Ce qui n'existe pas encore
 

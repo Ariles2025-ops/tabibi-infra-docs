@@ -3,7 +3,7 @@ flowchart TB
   subgraph org["Organisation GitHub Tabibi : quatre dépôts, branche principale protégée (pas de push direct)"]
     direction LR
     R1["tabibi-backend<br/>API Spring Boot<br/>CI : mvn verify + image GHCR"]
-    R2["tabibi-web<br/>Angular 18<br/>CI : npm ci, ng build, ng test"]
+    R2["tabibi-web<br/>Angular 18<br/>CI : npm ci, build, Playwright"]
     R3["tabibi-mobile<br/>Flutter 3<br/>CI : analyze, test, APK debug"]
     R4["tabibi-infra-docs<br/>documentation, compose dev,<br/>realm Keycloak, diagrammes"]
     R1 ~~~ R2 ~~~ R3 ~~~ R4

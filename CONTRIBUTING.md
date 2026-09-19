@@ -18,7 +18,8 @@ request.** Message conventionnel `type(scope): description` (`feat`, `fix`, `doc
 - La branche principale s'appelle `main` sur GitHub (les workflows publient les images seulement depuis `main` ;
   un dépôt local encore sur `master` est renommé au premier push : `git branch -M main`).
 - **Pas de push direct** : tout passe par une pull request.
-- **CI verte obligatoire** avant fusion : `mvn verify` (backend), `npm ci` + `ng build` + `ng test` (web),
+- **CI verte obligatoire** avant fusion : `mvn verify` (backend), `npm ci` + `npm run build` + `npm test`
+  (web : un seul job de test, Playwright),
   `flutter analyze` + `flutter test` + APK (mobile), et le workflow `integration` de ce dépôt (pile réelle API +
   Keycloak + PostgreSQL + web, rejoué chaque lundi : un rouge du lundi signale une dérive entre dépôts). Aucun test
   désactivé pour « faire passer » la CI.

@@ -419,8 +419,12 @@ construction figerait un annuaire vide).
 sans le rôle, retour à l'accueil (`router.parseUrl('/')`). Ce sont des conforts d'interface : l'autorisation réelle
 reste côté API.
 
-**Tests.** Karma / Jasmine, 271 specs (`ng test --watch=false --browsers=ChromeHeadlessCI`), services avec
-`HttpTestingController`, composants avec services factices.
+**Tests.** Playwright, seul outil de test du dépôt : 296 tests répartis en deux projets, `logique` (39 tests, dans
+node, sans navigateur : dictionnaires i18n et fonctions pures `*.formats.ts`) et `navigateur` (257 tests dans
+Chromium sur le build rendu côté serveur face à une API simulée, dont 19 parcours de bout en bout). Tout ce qui
+dépend d'Angular — composants, appels HTTP, gardes de rôle, SEO, i18n rendue — est vérifié à l'écran ou sur la
+requête réellement envoyée. `npm test` lance les deux projets, `npm run test:logique` les modules purs en quelques
+secondes, `npm run test:ui` le mode interactif.
 
 ## 10. Application mobile (Flutter)
 
@@ -482,9 +486,9 @@ cher à faire tourner. On écrit au niveau le plus bas qui puisse répondre à l
 
 | Niveau | Où | Ce qui tourne | Ce que cela prouve | Ce que cela ne prouve pas |
 |---|---|---|---|---|
-| **1. Unitaire et tranche** | chaque dépôt de code | JVM ou navigateur headless, sans réseau : tests de domaine et de service, `@WebMvcTest` avec un jeton factice, specs Angular avec services factices, tests Flutter avec `FakeApiService` | les règles métier, les codes HTTP, les 401 / 403, le rendu d'un composant — en quelques secondes, à chaque sauvegarde | que les briques se parlent |
-| **2. Bout en bout dans le dépôt** | `tabibi-backend` (`ScenarioApiTest`), `tabibi-web` (Playwright sur une API simulée) | l'application entière, mais avec des adaptateurs en mémoire ou une API simulée : ni Docker, ni base, ni Keycloak | qu'un parcours complet tient d'un bout à l'autre du dépôt, hors ligne, en moins d'une minute | que la vraie base, le vrai Keycloak et les vraies images fonctionnent ensemble |
-| **3. Pile réelle** | `tabibi-infra-docs`, `integration/` | PostgreSQL 16, Keycloak 26 avec le realm versionné, l'API construite depuis les sources, l'image du front web — puis `scenario-api.mjs` (vrais jetons, 20 étapes) et **Playwright dans Chromium** sur le front (`integration/web`, 10 tests) | que les migrations Liquibase passent sur une base vierge, que les jetons du vrai Keycloak sont acceptés, que le rendu côté serveur appelle la vraie API, et que l'application se comporte comme prévu dans un navigateur devant ces données-là | la mise en production elle-même : Caddy, TLS, domaine réel, images publiées (voir [DEPLOIEMENT.md](DEPLOIEMENT.md), section 16) |
+| **1. Unitaire et tranche** | chaque dépôt de code | JVM, node ou navigateur headless, sans réseau : tests de domaine et de service, `@WebMvcTest` avec un jeton factice, projet Playwright `logique` du web (modules purs dans node), tests Flutter avec `FakeApiService` | les règles métier, les codes HTTP, les 401 / 403, le formatage et la validation — en quelques secondes, à chaque sauvegarde | que les briques se parlent |
+| **2. Bout en bout dans le dépôt** | `tabibi-backend` (`ScenarioApiTest`), `tabibi-web` (projet Playwright `navigateur` : 257 tests dont 19 parcours, sur une API simulée) | l'application entière, mais avec des adaptateurs en mémoire ou une API simulée : ni Docker, ni base, ni Keycloak | qu'un parcours complet tient d'un bout à l'autre du dépôt, hors ligne, en moins d'une minute | que la vraie base, le vrai Keycloak et les vraies images fonctionnent ensemble |
+| **3. Pile réelle** | `tabibi-infra-docs`, `integration/` | PostgreSQL 16, Keycloak 26 avec le realm versionné, l'API construite depuis les sources, l'image du front web — puis `scenario-api.mjs` (vrais jetons, 21 étapes, résultat déposé dans `resultat-scenario.json`) et **Playwright dans Chromium** sur le front (`integration/web`, 10 tests, dont la vérification du code d'une ordonnance réellement émise) | que les migrations Liquibase passent sur une base vierge, que les jetons du vrai Keycloak sont acceptés, que le rendu côté serveur appelle la vraie API, et que l'application se comporte comme prévu dans un navigateur devant ces données-là | la mise en production elle-même : Caddy, TLS, domaine réel, images publiées (voir [DEPLOIEMENT.md](DEPLOIEMENT.md), section 16) |
 
 **Un seul outil de test navigateur dans tout le projet : Playwright.** Le même outil sert au niveau 2 (dans
 `tabibi-web`, devant une API simulée) et au niveau 3 (dans `tabibi-infra-docs`, devant la pile réelle) : mêmes aides

@@ -5,7 +5,7 @@ flowchart LR
     REPO_B["tabibi-backend<br/>push sur main"]
     REPO_W["tabibi-web<br/>push sur main"]
     CI_B["GitHub Actions ci.yml<br/>mvn verify, puis image Docker"]
-    CI_W["GitHub Actions ci.yml<br/>npm ci, ng build, ng test,<br/>puis image Docker"]
+    CI_W["GitHub Actions ci.yml<br/>npm ci, build, Playwright,<br/>puis image Docker"]
     GHCR[("GHCR<br/>ghcr.io/ORG/tabibi-backend:latest, sha-xxxx<br/>ghcr.io/ORG/tabibi-web:latest")]
     REPO_B --> CI_B --> GHCR
     REPO_W --> CI_W --> GHCR

@@ -79,7 +79,7 @@
   <div class="grille">
     <div class="carte"><h3>Sécurité d'abord</h3><p>Données de patients : Keycloak (OIDC, PKCE, MFA), JWT validé à chaque requête, autorisation par rôle puis par propriétaire, aucune donnée de santé dans les journaux ni les notifications.</p></div>
     <div class="carte"><h3>Portabilité</h3><p>JPA + Liquibase, images OCI, configuration par variables d'environnement : base et hébergeur remplaçables.</p></div>
-    <div class="carte"><h3>Testabilité</h3><p>Chaque fonctionnalité arrive avec ses tests : domaine, service, tranche web, intégration PostgreSQL, specs Angular, tests Flutter.</p></div>
+    <div class="carte"><h3>Testabilité</h3><p>Chaque fonctionnalité arrive avec ses tests : domaine, service, tranche web, intégration PostgreSQL, Playwright pour le front (seul outil de test navigateur du projet), tests Flutter.</p></div>
     <div class="carte"><h3>Clarté</h3><p>Architecture hexagonale, un module par domaine, nommage en français, un commit par fonctionnalité, journal dans chaque dépôt.</p></div>
     <div class="carte"><h3>Progressivité</h3><p>Fonctionnalité par fonctionnalité, un serveur pour commencer, une voie d'évolution sans réécriture.</p></div>
   </div>
@@ -179,7 +179,7 @@
 <section id="clients">
   <h2>10. Front web et application mobile</h2>
   <div class="grille">
-    <div class="carte"><h3>Web (Angular 18)</h3><p>Un dossier par domaine (service HTTP + composants standalone), <code>auth/</code> (OIDC, intercepteur, rôles, gardes), configuration lue à l'exécution dans <code>assets/config.json</code> ; rendu côté serveur des pages publiques (<code>@angular/ssr</code>, <code>server.ts</code>) ; image Node qui écrit cette configuration et calcule la CSP au démarrage. 271 specs Karma / Jasmine.</p></div>
+    <div class="carte"><h3>Web (Angular 18)</h3><p>Un dossier par domaine (service HTTP + composants standalone), <code>auth/</code> (OIDC, intercepteur, rôles, gardes), configuration lue à l'exécution dans <code>assets/config.json</code> ; rendu côté serveur des pages publiques (<code>@angular/ssr</code>, <code>server.ts</code>) ; image Node qui écrit cette configuration et calcule la CSP au démarrage. 296 tests Playwright (39 dans node, 257 dans Chromium dont 19 parcours).</p></div>
     <div class="carte"><h3>Mobile (Flutter 3)</h3><p>Application patient : recherche, fiche et réservation, rendez-vous, ordonnances, notifications, téléconsultations, messagerie, avis, Dawini, listes d'attente, profil. Configuration par <code>--dart-define</code>, connexion AppAuth + PKCE, tests avec un <code>FakeApiService</code>.</p></div>
   </div>
   <p>Routes, gardes et structure détaillées dans <code>docs/ARCHITECTURE.md</code> ; liste fonctionnelle par acteur dans <code>docs/FONCTIONNALITES.md</code>.</p>
@@ -203,10 +203,10 @@
   <table>
     <thead><tr><th>Dépôt</th><th>Version</th><th>Commits</th><th>Contenu</th></tr></thead>
     <tbody>
-      <tr><td>tabibi-backend</td><td>v0.22.0</td><td>23</td><td>17 modules, 16 changelogs, 50 classes de test, image de production, orchestration, realm durci</td></tr>
-      <tr><td>tabibi-web</td><td>v0.19.0</td><td>20</td><td>tous les espaces (patient, médecin, secrétaire, pharmacie, administrateur), rendu côté serveur, 271 specs, image Node, CI GHCR</td></tr>
-      <tr><td>tabibi-mobile</td><td>v0.13.0</td><td>14</td><td>application patient complète, CI avec APK, préparation des stores</td></tr>
-      <tr><td>tabibi-infra-docs</td><td></td><td></td><td>documentation, compose de dev, realm, 24 diagrammes</td></tr>
+      <tr><td>tabibi-backend</td><td>v0.27.0</td><td>31</td><td>17 modules, 16 changelogs, 63 classes de test, image de production, orchestration, realm durci, PDF, i18n, données personnelles, supervision</td></tr>
+      <tr><td>tabibi-web</td><td>v0.24.0</td><td>30</td><td>tous les espaces (patient, médecin, secrétaire, pharmacie, administrateur), rendu côté serveur, interface en trois langues, 296 tests Playwright (39 dans node, 257 dans Chromium dont 19 parcours), image Node, CI GHCR</td></tr>
+      <tr><td>tabibi-mobile</td><td>v0.15.0</td><td>16</td><td>application patient complète, interface en trois langues, CI avec APK, préparation des stores</td></tr>
+      <tr><td>tabibi-infra-docs</td><td>—</td><td>22</td><td>documentation, compose de dev, realm, 24 diagrammes, pile d'intégration réelle (scénario API et tests Playwright du front) et workflow <code>integration</code></td></tr>
     </tbody>
   </table>
   <p>Reste à faire : conformité et durcissement avant la production, SMS / e-mail, nom du patient dans les écrans du

@@ -30,7 +30,7 @@
 | Tests backend | JUnit 5, Mockito, Spring Security Test, Testcontainers | Testcontainers 1.20.4 | tabibi-backend |
 | Identité | Keycloak | 26.0 (`quay.io/keycloak/keycloak:26.0`) | infra |
 | Front web | Angular (standalone, signaux, SSR) + angular-oauth2-oidc | Angular 18.2, @angular/ssr 18.2, angular-oauth2-oidc 17, TypeScript 5.5, Node 20 | tabibi-web |
-| Tests web | Karma / Jasmine (Chrome headless) | Karma 6.4, Jasmine 5.1 | tabibi-web |
+| Tests web | Playwright (seul outil : projets `logique` dans node et `navigateur` dans Chromium) | @playwright/test 1.63 (web), 1.47 (`integration/web`) | tabibi-web, tabibi-infra-docs |
 | Serveur web | Node + express (rendu côté serveur et fichiers statiques, `server.ts`) | `node:20-alpine`, express 4 | tabibi-web |
 | Mobile | Flutter / Dart + flutter_appauth, http, url_launcher, flutter_secure_storage | SDK Dart >= 3.5, flutter_appauth 8, http 1.2, url_launcher 6.3 | tabibi-mobile |
 | Vidéo | Jitsi Meet (lien de salle, aucun SDK) | instance `https://meet.jit.si` par défaut | tabibi-backend |
@@ -117,9 +117,9 @@ unique, c'est absorbé.
 ## 5. Front web : Angular 18
 
 **Pourquoi.**
-- **Un cadre complet et cohérent** : routeur, client HTTP et intercepteurs, formulaires, injection de dépendances,
-  tests (Karma / Jasmine) et CLI livrés ensemble ; les choix d'architecture sont faits pour l'équipe, ce qui compte
-  quand elle grandit.
+- **Un cadre complet et cohérent** : routeur, client HTTP et intercepteurs, formulaires, injection de dépendances
+  et CLI livrés ensemble ; les choix d'architecture sont faits pour l'équipe, ce qui compte quand elle grandit.
+  (Le dépôt web teste avec Playwright plutôt qu'avec l'outillage de specs fourni par le CLI : voir section 9.)
 - **TypeScript de bout en bout**, composants standalone et signaux (Angular 18) : moins de cérémonie qu'avant, code
   lisible.
 - **OIDC prêt** : `angular-oauth2-oidc` (Authorization Code + PKCE, discovery document, `state` pour revenir sur la
@@ -197,7 +197,8 @@ unique, c'est absorbé.
 **Pourquoi.**
 - **GitHub** : organisation avec quatre dépôts, branche principale protégée (pull request, CI verte, revue).
 - **GitHub Actions** : la CI vit à côté du code (`.github/workflows/ci.yml`) : `mvn verify` (backend),
-  `npm ci` + `ng build` + `ng test` (web), `flutter analyze` + `flutter test` + APK (mobile).
+  `npm ci` + `npm run verif:tests` + `npm run build` + `npx playwright test` en un seul job de test (web),
+  `flutter analyze` + `flutter test` + APK (mobile).
 - **GHCR** : le registre d'images est celui de GitHub ; l'authentification utilise le `GITHUB_TOKEN` du workflow,
   aucun compte ni secret supplémentaire ; tags `latest` et `sha-<commit>` (déploiement reproductible).
 - **Dependabot** : pull requests hebdomadaires de mise à jour (Maven, npm, Actions, images Docker), vérifiées par la CI.

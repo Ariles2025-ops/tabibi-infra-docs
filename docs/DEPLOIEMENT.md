@@ -271,12 +271,13 @@ navigateur** (Chromium piloté par Playwright, le seul outil de test navigateur 
 | L'image de l'API se construit depuis les sources et démarre en profil `postgres` : les 16 changelogs Liquibase s'appliquent sur un PostgreSQL 16 vierge et `ddl-auto: validate` accepte le schéma | `docker compose up --build`, attente de `/actuator/health` |
 | Le realm versionné s'importe dans Keycloak 26 et les comptes de démonstration s'y connectent (grant `password` du client `tabibi-web`) | `scenario-api.mjs`, étape « Jetons » |
 | L'API accepte les jetons signés par ce Keycloak, avec l'émetteur public et les clés lues sur le réseau interne (le montage de `docker-compose.prod.yml`), et en lit les rôles | `GET /api/moi` pour les trois comptes, 401 sans jeton |
-| Le parcours métier fonctionne de bout en bout avec la vraie base : créneau, candidature validée par l'administrateur, annuaire, réservation (201 puis 409), rendez-vous, notifications, rendez-vous honoré, avis et synthèse publique anonyme, ordonnance, vérification publique et PDF imprimable (OpenPDF et ZXing dans le JRE alpine de l'image) | 20 étapes du scénario |
+| Le parcours métier fonctionne de bout en bout avec la vraie base : créneau, candidature validée par l'administrateur, annuaire, réservation (201 puis 409), rendez-vous, notifications, rendez-vous honoré, avis et synthèse publique anonyme, ordonnance, vérification publique et PDF imprimable (OpenPDF et ZXing dans le JRE alpine de l'image) | 21 étapes du scénario |
 | Les refus sont bien ceux du serveur : 403 d'un patient sur `/api/admin/**` et sur `POST /api/medecin/creneaux` | scénario, dernière étape |
 | L'image du front web se construit, écrit `assets/config.json` à partir des variables, et son serveur de rendu appelle la **vraie** API : `/` contient « Trouver un praticien » et chaque praticien renvoyé par `GET /api/medecins`, `/medecins/<id>` contient le nom et la spécialité du praticien, la CSP autorise l'origine de l'API | tests Playwright de `integration/web` (HTML relu sans navigateur : le JavaScript n'a pas tourné) |
 | **Dans un vrai navigateur** (Chromium) : l'application s'hydrate, la recherche par spécialité filtre réellement la liste comme l'API avec le même filtre, `/verifier` refuse un code inconnu, le sélecteur de langue bascule la page en arabe (`dir="rtl"`) — le tout sur les données réelles de l'API, rien n'est codé en dur dans les tests | `integration/web/tests/pile-reelle.spec.ts`, 10 tests |
 | Une page privée (`/mes-rendez-vous`) renvoie vers le **Keycloak réel** : la navigation finit sur l'émetteur de la pile (`realms/tabibi`, `auth`), avec `client_id=tabibi-web` et `response_type=code` | même fichier, test « page privée » |
 | `robots.txt` et `sitemap.xml` sont servis, et le plan du site annonce la fiche du premier praticien de l'API | même fichier, test « robots.txt et sitemap.xml » |
+| La vérification publique accepte le code d'une ordonnance **réellement émise** par le scénario : le code est transmis par `integration/resultat-scenario.json`, l'API le confirme, puis la page `/verifier` l'affiche comme authentique | même fichier, test « code d'une vraie ordonnance » |
 
 Ce qu'elle **ne prouve pas** (à vérifier autrement) :
 
@@ -285,9 +286,6 @@ Ce qu'elle **ne prouve pas** (à vérifier autrement) :
 - La connexion **jusqu'au bout** depuis un navigateur : la CI prouve que la page privée part vers le Keycloak réel
   avec les bons paramètres OIDC, pas qu'un compte s'y connecte (saisie du mot de passe, PKCE, retour du code,
   échange du jeton, appel authentifié). Il faudra pour cela piloter la page de connexion de Keycloak.
-- Le cas du **code valide** de `/verifier` : le scénario API émet une vraie ordonnance, mais son code n'est pas
-  encore transmis aux tests navigateur (variable `CODE_ORDONNANCE`) ; ce test est sauté tant qu'elle est absente, et
-  le journal du job le dit. Le cas du code inconnu, lui, est vérifié.
 - L'application mobile : elle parle la même API (`ApiService`), mais aucun émulateur ne tourne en CI.
 - Les rappels planifiés, les SMS / e-mails (adaptateurs absents), la charge, la restauration d'une sauvegarde.
 

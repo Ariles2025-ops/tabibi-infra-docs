@@ -5,7 +5,7 @@
 > pour voir d'un coup d'oeil comment le produit a été construit et retrouver le commit d'une fonctionnalité. Le
 > détail (règles métier, endpoints, tests) reste dans le journal du dépôt concerné. Ordre chronologique des commits
 > (dates UTC), état au 19 septembre 2026 (recompté par `git rev-list --count HEAD` à cette date) : backend 31 commits
-> (v0.27.0), web 26 commits (v0.23.0), mobile 16 commits (v0.15.0), infra-docs 20 commits. D'autres commits arrivent en
+> (v0.27.0), web 30 commits (v0.24.0), mobile 16 commits (v0.15.0), infra-docs 22 commits. D'autres commits arrivent en
 > parallèle dans les dépôts de code : recompter (`git rev-list --count HEAD`) avant de citer ces chiffres.
 
 ## Comment lire
@@ -43,7 +43,7 @@
 | 2026-09-18 | backend | v0.10.0 | `6ade583` | Administration : candidature du médecin, validation (publication dans l'annuaire) ou refus motivé par l'administrateur, statistiques, verrou `/api/admin/**`, comptes de démonstration Keycloak, Liquibase 008 |
 | 2026-09-18 | mobile | v0.5.0 | `4f1d143` | Notifications : « Mes notifications » (marquer lue, tout marquer lu, tirer pour rafraîchir), entrée « Notifications (n) » sur l'accueil |
 | 2026-09-18 | mobile | v0.6.0 | `cef96cb` | Téléconsultation : « Mes téléconsultations », carte de consentement, « Rejoindre » dans le navigateur externe (url_launcher) |
-| 2026-09-18 | web | v0.6.0 | `312b010` | Notifications : cloche dans la barre de navigation (compteur relu toutes les 60 s), `/notifications` ; infrastructure de test Karma / Jasmine et workflow CI |
+| 2026-09-18 | web | v0.6.0 | `312b010` | Notifications : cloche dans la barre de navigation (compteur relu toutes les 60 s), `/notifications` ; infrastructure de test Karma / Jasmine (**retirée en v0.24.0**, `cd7cc63` : Playwright seul) et workflow CI |
 
 ## 19 septembre 2026 : téléconsultation web, administration, messagerie, avis, Dawini
 
@@ -94,7 +94,7 @@
 | 2026-09-19 | infra | — | `22e4529` | Tests d'intégration réels : `integration/docker-compose.integration.yml` (PostgreSQL 16, Keycloak 26 avec le realm du backend, API construite depuis `tabibi-backend` en profil `postgres`), `scenario-api.mjs` (jetons Keycloak réels, 19 étapes du parcours créneau, candidature validée, réservation, notification, honoré, avis, ordonnance, 401 / 403 / 409), `lancer.sh` |
 | 2026-09-19 | infra | — | `ad31ea1` | CI d'intégration `.github/workflows/integration.yml` (push `main`, pull request, manuel, hebdomadaire) : clone des dépôts de code, pile réelle et scénario, image web lancée face à l'API réelle, `verifier-web.sh` (config, `/` et fiche rendues côté serveur avec les praticiens de l'API, CSP), journaux en artefact |
 | 2026-09-19 | infra | — | `faf9156` | Scénario : étape PDF de l'ordonnance imprimable (`application/pdf`, `%PDF-`), sautée si l'API est antérieure à v0.23.0 |
-| 2026-09-19 | infra | — | (ce commit) | Journal, tableau d'avancement, fonctionnalités et sécurité mis à jour pour la vague intégration et les derniers commits du backend (v0.22.1 à v0.24.0) et du web (v0.19.1, v0.20.0) |
+| 2026-09-19 | infra | — | `a91d640` | Journal, tableau d'avancement, fonctionnalités et sécurité mis à jour pour la vague intégration et les derniers commits du backend (v0.22.1 à v0.24.0) et du web (v0.19.1, v0.20.0) |
 | 2026-09-19 | web | v0.22.0 | `ed04e89` | Ordonnance imprimable côté web : `GET /api/ordonnances/{id}/pdf` en blob, bouton « Télécharger le PDF » sur le détail (patient et médecin), garde hors navigateur |
 | 2026-09-19 | mobile | v0.14.0 | `4520483` | Ordonnance imprimable côté mobile : téléchargement du PDF, enregistrement temporaire et ouverture par l'application du téléphone (`path_provider`, `open_filex`) |
 | 2026-09-19 | backend | v0.25.0 | `c25eb26` | Messages d'API et notifications en français, arabe et anglais : `Langue` (`Accept-Language`), catalogue `messages/{fr,ar,en}.properties` (75 clés), erreurs métier à clés traduites par `GestionErreursApi`, notifications rendues dans la langue du profil du destinataire (port `LanguePreferee`) |
@@ -102,15 +102,21 @@
 | 2026-09-19 | backend | v0.27.0 | `0ebb07a`, `5a3cebc` | Supervision : Micrometer/Prometheus réservé au rôle ADMIN, compteurs métier (réservations, annulations, ordonnances, téléconsultations, avis, dépassements de débit) derrière un port `Compteurs`, journalisation structurée avec identifiant de requête |
 | 2026-09-19 | web | v0.23.0 | `4b5ca61` | Interface en français, arabe et anglais : service de traduction à l'exécution (signal + dictionnaires de ~430 clés), pipes `t` et `dateLocale`, `lang`/`dir` corrects jusqu'au rendu serveur (`Accept-Language`), styles RTL, sélecteur de langue, titres et descriptions traduits ; 331 specs, 19 tests de bout en bout |
 | 2026-09-19 | mobile | v0.15.0 | `defce12` | Interface en français, arabe et anglais : dictionnaires de 250 clés, `LangueScope` et `t(...)`, `MaterialApp` localisée (RTL par la locale), dates `intl`, écran « Langue », langue initialisée depuis le profil |
-| 2026-09-19 | infra | — | (ce commit) | Journal complété pour la vague « impression, langues, données personnelles et supervision » |
+| 2026-09-19 | infra | — | `ffea450` | Journal complété pour la vague « impression, langues, données personnelles et supervision » |
 | 2026-09-19 | web | — | `cc107ae` | Socle Playwright : Playwright devient l'outil unique du dépôt web (projets `logique`, sans navigateur, et `navigateur`, Chromium sur le build SSR face à l'API simulée), `e2e/` devient `tests/parcours/`, aides réutilisables `ouvrir` / `connecter` / `stub` / `requetes` ; 19 → 77 tests Playwright, 331 → 257 specs Karma |
 | 2026-09-19 | infra | — | `84369d5` | Le front vérifié en **Playwright contre la pile réelle** : `integration/web` (`@playwright/test` seul, projet `chromium`, aucun `webServer`), `tests/outils.ts` (`ouvrir` qui attend l'hydratation, `lireApi` / `praticiens` qui construisent les attentes depuis l'API réelle, `htmlRendu` pour le rendu serveur) et 10 tests : configuration servie, accueil et fiche avec les praticiens de l'API, recherche par spécialité réellement filtrante, code d'ordonnance inconnu (et valide si `CODE_ORDONNANCE`), page privée vers le Keycloak réel, `robots.txt` et `sitemap.xml`, CSP, bascule en arabe. `verifier-web.sh` réécrit en lanceur mince ; le contrôle en `curl` disparaît |
 | 2026-09-19 | infra | — | `e86ac20` | CI d'intégration : étape Playwright à la place de l'étape `curl` (cache npm, `playwright install --with-deps chromium`), rapport HTML, traces, captures et vidéos publiés en artefact `playwright-integration-web` à chaque exécution, journaux des conteneurs et `down -v` conservés |
-| 2026-09-19 | infra | — | (ce commit) | Documentation de l'outil unique : README (tests d'intégration réels, avancement), guide du développeur (lancer les tests en local, lire le rapport et les traces), déploiement (ce que la CI prouve : navigateur réel, et ce qu'elle ne prouve pas), architecture (section 12, trois niveaux de preuve) |
+| 2026-09-19 | infra | — | `e6c9de8` | Documentation de l'outil unique : README (tests d'intégration réels, avancement), guide du développeur (lancer les tests en local, lire le rapport et les traces), déploiement (ce que la CI prouve : navigateur réel, et ce qu'elle ne prouve pas), architecture (section 12, trois niveaux de preuve) |
+| 2026-09-19 | web | — | `dc18d5f` | Services migrés : les fonctions pures partent dans le projet `logique` (`*.formats.ts` réexportés par leur service, aucun import existant ne change) et les appels HTTP sont vérifiés dans le navigateur sur la requête réellement envoyée (`requetes(page)`) avec des réponses 400 / 403 / 404 / 409 fabriquées par `stub(page, ...)` ; aide `accepterConfirmations` pour les `confirm()`. 77 → 151 tests Playwright, 257 → 170 specs de l'ancien outillage |
+| 2026-09-19 | web | — | `54bb2ad` | Écrans patients migrés : annuaire, fiche du praticien, rendez-vous, ordonnances et PDF, avis, messagerie, notifications, téléconsultations, Dawini, listes d'attente, compte et profil — chaque assertion a son équivalent observable à l'écran ou dans la requête. Deux techniques : atteindre la fiche par un clic (sinon le cache de transfert du rendu serveur masque les appels) et avancer les minuteries avec `page.clock`. 151 → 236 tests, 170 → 75 specs |
+| 2026-09-19 | web | — | `69fb386` | Espaces médecin, secrétaire, pharmacie et administration migrés (tableau de bord, candidatures, modération des avis, agenda, disponibilités, secrétaires, liste d'attente, téléconsultations, réponses des pharmacies) : 236 → 296 tests, 75 → 0 spec, plus aucun `*.spec.ts` sous `src/`. Une seule assertion sans équivalent observable (message des bornes 5..120, inatteignable parce que le champ bloque la soumission avant) |
+| 2026-09-19 | web | v0.24.0 | `cd7cc63` | **Playwright, outil de test unique** : `karma.conf.js`, `src/test.ts`, `tsconfig.spec.json`, la cible `test` d'`angular.json` et les dépendances Karma / Jasmine sont retirés. `npm test` lance `playwright test`, `npm run test:logique` et `npm run test:navigateur` ciblent un projet, `npm run test:ui` le mode interactif ; `npm run verif:tests` échoue s'il reste une spec sous `src/` ou une de ces dépendances. Un seul job de test en CI, rapport HTML joint en cas d'échec. Bilan : 296 tests Playwright (39 `logique` + 257 `navigateur`, dont 19 parcours), 0 spec de l'ancien outillage (331 au départ) |
+| 2026-09-19 | infra | — | `3565bbd` | Le code de l'ordonnance émise transmis aux tests navigateur : `scenario-api.mjs` dépose `{ medecinId, rendezVousId, ordonnanceId, codeOrdonnance, genereLe }` dans `integration/resultat-scenario.json` (chemin surchargeable par `FICHIER_RESULTAT`, jamais commité), `lancer.sh` l'expose et l'efface avec la pile, `verifier-web.sh` le lit et exporte `CODE_ORDONNANCE` — le cas « code de vérification valide » de `integration/web` n'est plus sauté (10 tests sur 10) |
+| 2026-09-19 | infra | — | (ce commit) | Chiffres à jour après la migration Playwright du front : carte des dépôts et badges, tableau d'avancement, journal (les cinq commits de migration), architecture, guide du développeur, fonctionnalités et choix techniques ; Karma et Jasmine ne sont plus cités que comme historique daté, les commandes réelles du web sont `npm test`, `npm run test:logique` et `npm run test:ui` |
 
 ## Ce que dit ce journal
 
-- **93 commits** en deux jours : 31 backend, 26 web, 16 mobile, plus ce dépôt (20).
+- **99 commits** en deux jours : 31 backend, 30 web, 16 mobile, plus ce dépôt (22).
 - Chaque fonctionnalité a été livrée **API d'abord**, puis web, puis mobile pour le patient, avec ses tests et
   son entrée de journal : la trace est complète du besoin au commit.
 - Les derniers commits du backend et du web sont consacrés à la **mise en production** (images, orchestration,
@@ -126,3 +132,7 @@
   API simulée et dans ce dépôt devant la pile réelle, dans un vrai Chromium. Le contrôle en `curl` du front a
   disparu ; rapports, traces, captures et vidéos sont publiés par la CI d'intégration. Les trois niveaux de preuve
   sont décrits dans [ARCHITECTURE.md](ARCHITECTURE.md), section 12.
+- La migration du dépôt web est **terminée** (`cc107ae` → `cd7cc63`, v0.24.0) : 331 specs de l'ancien outillage
+  remplacées par **296 tests Playwright** (39 dans node, 257 dans Chromium dont 19 parcours), aucune spec sous
+  `src/`, un seul job de test en CI. Chaque étape a été livrée avec son décompte, et un garde-fou
+  (`npm run verif:tests`) interdit le retour de l'ancien outillage.

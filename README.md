@@ -1,6 +1,9 @@
 # Tabibi : infrastructure et documentation
 
 [![integration](https://github.com/<org>/tabibi-infra-docs/actions/workflows/integration.yml/badge.svg)](https://github.com/<org>/tabibi-infra-docs/actions/workflows/integration.yml)
+[![backend](https://github.com/<org>/tabibi-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/<org>/tabibi-backend/actions/workflows/ci.yml)
+[![web](https://github.com/<org>/tabibi-web/actions/workflows/ci.yml/badge.svg)](https://github.com/<org>/tabibi-web/actions/workflows/ci.yml)
+[![mobile](https://github.com/<org>/tabibi-mobile/actions/workflows/ci.yml/badge.svg)](https://github.com/<org>/tabibi-mobile/actions/workflows/ci.yml)
 
 > **Pourquoi ce document.** C'est la porte d'entrée du projet Tabibi v2 : ce qu'est la plateforme, où sont les
 > dépôts, quels documents lire, comment tout lancer en dix minutes, où en est chaque dépôt et ce qu'il reste à faire.
@@ -17,10 +20,10 @@ médecin, secrétaire, pharmacie, administrateur.
 
 | Dépôt | Rôle | Pile | Avancement |
 |---|---|---|---|
-| [`tabibi-backend`](https://github.com/<org>/tabibi-backend) | API métier, orchestration de production (`docker-compose.prod.yml`, `infra/`) | Spring Boot 3.4.1 / Java 21, Spring Security + Keycloak JWT, JPA, Liquibase, PostgreSQL 16 | v0.24.1, 27 commits, 17 modules, 16 changelogs, 54 classes de test |
-| [`tabibi-web`](https://github.com/<org>/tabibi-web) | Front web, tous les rôles | Angular 18.2 (standalone, signaux, SSR), angular-oauth2-oidc, Karma / Jasmine, image Node | v0.21.0, 23 commits, 286 specs + 16 tests Playwright |
-| [`tabibi-mobile`](https://github.com/<org>/tabibi-mobile) | Application patient Android et iOS | Flutter 3 (Dart >= 3.5), flutter_appauth, http | v0.13.0, 14 commits, CI avec APK |
-| `tabibi-infra-docs` (ce dépôt) | Documentation vivante, environnement de dev, copie du realm Keycloak, diagrammes, **tests d'intégration réels des trois briques** | Docker Compose, Keycloak 26, Mermaid, Node 20 | 24 diagrammes, 8 documents, scénario d'intégration (20 étapes) + 10 tests Playwright du web contre la pile réelle, workflow `integration` |
+| [`tabibi-backend`](https://github.com/<org>/tabibi-backend) | API métier, orchestration de production (`docker-compose.prod.yml`, `infra/`) | Spring Boot 3.4.1 / Java 21, Spring Security + Keycloak JWT, JPA, Liquibase, PostgreSQL 16 | v0.27.0, 31 commits, 17 modules, 16 changelogs, 63 classes de test |
+| [`tabibi-web`](https://github.com/<org>/tabibi-web) | Front web, tous les rôles | Angular 18.2 (standalone, signaux, SSR), angular-oauth2-oidc, Playwright, image Node | v0.24.0, 30 commits, 296 tests Playwright (39 logique + 257 navigateur) |
+| [`tabibi-mobile`](https://github.com/<org>/tabibi-mobile) | Application patient Android et iOS | Flutter 3 (Dart >= 3.5), flutter_appauth, http | v0.15.0, 16 commits, CI avec APK |
+| `tabibi-infra-docs` (ce dépôt) | Documentation vivante, environnement de dev, copie du realm Keycloak, diagrammes, **tests d'intégration réels des trois briques** | Docker Compose, Keycloak 26, Mermaid, Node 20, Playwright | 22 commits, 24 diagrammes, 8 documents, scénario d'intégration (21 étapes) + 10 tests Playwright du web contre la pile réelle, workflow `integration` |
 
 Remplacer `<org>` par l'organisation GitHub qui héberge les dépôts.
 
@@ -84,8 +87,9 @@ curl -s -X POST http://localhost:8081/realms/tabibi/protocol/openid-connect/toke
   | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])'
 ```
 
-Tester : `mvn test` (backend), `npx ng test --watch=false --browsers=ChromeHeadlessCI` (web),
-`flutter test` (mobile). Détails dans [docs/GUIDE-DEVELOPPEUR.md](docs/GUIDE-DEVELOPPEUR.md).
+Tester : `mvn test` (backend), `npm test` (web : Playwright, seul outil de test du dépôt ; `npm run test:logique`
+pour les modules purs sans navigateur), `flutter test` (mobile). Détails dans
+[docs/GUIDE-DEVELOPPEUR.md](docs/GUIDE-DEVELOPPEUR.md).
 
 ## Tests d'intégration réels (API + Keycloak + PostgreSQL + navigateur)
 
@@ -95,7 +99,9 @@ Keycloak 26 (realm et comptes de démonstration importés), attend que tout rép
 obtient de vrais jetons et déroule un parcours complet : identité et rôles, ouverture d'un créneau, candidature du
 médecin validée par l'administrateur, réservation, notification, rendez-vous honoré, avis et synthèse publique,
 ordonnance et vérification publique, refus 401 / 403. Chaque étape affiche `OK` ou `ECHEC` ; la pile est détruite à
-la fin (`down -v`).
+la fin (`down -v`). Le scénario dépose aussi son résultat (médecin publié, rendez-vous et **code de vérification de
+l'ordonnance émise**) dans `integration/resultat-scenario.json`, jamais commité : c'est par ce fichier que
+`integration/verifier-web.sh` obtient `CODE_ORDONNANCE` pour les tests navigateur.
 
 ```bash
 # tabibi-backend cloné à côté de ce dépôt ; Docker, Compose v2 et Node 20 installés
@@ -113,8 +119,9 @@ integration/verifier-web.sh                 # ou : cd integration/web && npm tes
 
 Les dix tests vérifient, à partir des **vraies données de l'API** (aucune liste codée en dur) : `assets/config.json`,
 l'accueil et la fiche du praticien rendus côté serveur, la recherche par spécialité réellement filtrante, la
-vérification publique d'une ordonnance, la redirection d'une page privée vers le Keycloak réel, `robots.txt` et
-`sitemap.xml`, la CSP qui autorise l'API, et la bascule de l'interface en arabe (`dir="rtl"`).
+vérification publique d'une ordonnance (code inconnu **et** code d'une ordonnance réellement émise, lu dans le
+résultat du scénario), la redirection d'une page privée vers le Keycloak réel, `robots.txt` et `sitemap.xml`, la CSP
+qui autorise l'API, et la bascule de l'interface en arabe (`dir="rtl"`).
 
 Le workflow [`.github/workflows/integration.yml`](.github/workflows/integration.yml) (badge ci-dessus) rejoue tout cela
 sur GitHub Actions à chaque push sur `main`, à chaque pull request, à la demande et chaque lundi, en clonant
@@ -161,6 +168,8 @@ Hash = commit qui a livré la fonctionnalité (voir [docs/JOURNAL.md](docs/JOURN
 | Scénario de bout en bout dans le dépôt (API simulée ou adaptateurs en mémoire, sans Docker) | v0.24.1 `7736cba` (`ScenarioApiTest`) | v0.21.0 `deb1202` (Playwright, 16 tests) | — |
 | Tests d'intégration réels des trois briques (pile Docker, scénario API, rendu serveur du web) et CI dédiée | infra-docs `22e4529`, `faf9156` (scénario contre l'API réelle, PDF compris) | infra-docs `ad31ea1` (image web face à l'API réelle) | pas encore (pas d'émulateur en CI) |
 | Front web vérifié dans un vrai navigateur (Playwright) contre la pile réelle | — | infra-docs `84369d5`, `e86ac20` (10 tests Chromium, rapport et traces en artefacts) | pas encore |
+| Un seul outil de test navigateur dans le dépôt web : migration complète vers Playwright, ancien outillage de specs retiré | — | v0.24.0 `cc107ae`, `dc18d5f`, `54bb2ad`, `69fb386`, `cd7cc63` (296 tests : 39 logique + 257 navigateur) | — |
+| Code de l'ordonnance émise transmis aux tests navigateur (`CODE_ORDONNANCE`), cas valide de `/verifier` couvert | — | infra-docs `3565bbd` (`resultat-scenario.json`) | — |
 
 ## Ce qu'il reste à faire
 
@@ -176,9 +185,7 @@ Détail et priorités dans [docs/SECURITE.md](docs/SECURITE.md) (section 5) et [
 3. **Mobile** : stockage sécurisé et rafraîchissement du jeton, notifications push, icône et écran de lancement,
    signature release depuis la CI, publication sur les stores.
 4. **Tests** : connexion OIDC réelle jusqu'au bout dans le navigateur (la CI d'intégration vérifie aujourd'hui que
-   la page privée part bien vers Keycloak, pas qu'un compte s'y connecte) ; transmettre à Playwright le code de
-   l'ordonnance émise par le scénario API (variable `CODE_ORDONNANCE`) pour vérifier aussi le cas valide de
-   `/verifier` ; tests mobiles contre l'API réelle.
+   la page privée part bien vers Keycloak, pas qu'un compte s'y connecte) ; tests mobiles contre l'API réelle.
 5. **Plus tard** : instance Jitsi dédiée, base managée puis plusieurs instances
    (voir [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md)).
 
@@ -190,7 +197,8 @@ CONTRIBUTING.md                règles de contribution
 docker-compose.yml             PostgreSQL 16 + Keycloak 26 pour le développement (identique à celui du backend)
 integration/                   tests d'intégration réels : pile Docker (docker-compose.integration.yml),
                                scénario API (scenario-api.mjs), lanceur (lancer.sh), lanceur des tests navigateur
-                               (verifier-web.sh) et tests Playwright du front (web/)
+                               (verifier-web.sh) et tests Playwright du front (web/) ; le scénario y dépose
+                               resultat-scenario.json (code de l'ordonnance émise, jamais commité)
 .github/workflows/integration.yml   la CI qui exécute cette pile réelle (API + Keycloak + PostgreSQL + web)
 infra/keycloak/tabibi-realm.json   copie du realm de développement (source de vérité : tabibi-backend)
 docs/*.md                      les documents listés plus haut
