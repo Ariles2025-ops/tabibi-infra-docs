@@ -17,10 +17,10 @@ médecin, secrétaire, pharmacie, administrateur.
 
 | Dépôt | Rôle | Pile | Avancement |
 |---|---|---|---|
-| [`tabibi-backend`](https://github.com/<org>/tabibi-backend) | API métier, orchestration de production (`docker-compose.prod.yml`, `infra/`) | Spring Boot 3.4.1 / Java 21, Spring Security + Keycloak JWT, JPA, Liquibase, PostgreSQL 16 | v0.22.0, 23 commits, 17 modules, 16 changelogs, 50 classes de test |
-| [`tabibi-web`](https://github.com/<org>/tabibi-web) | Front web, tous les rôles | Angular 18.2 (standalone, signaux, SSR), angular-oauth2-oidc, Karma / Jasmine, image Node | v0.19.0, 20 commits, 271 specs |
+| [`tabibi-backend`](https://github.com/<org>/tabibi-backend) | API métier, orchestration de production (`docker-compose.prod.yml`, `infra/`) | Spring Boot 3.4.1 / Java 21, Spring Security + Keycloak JWT, JPA, Liquibase, PostgreSQL 16 | v0.24.1, 27 commits, 17 modules, 16 changelogs, 54 classes de test |
+| [`tabibi-web`](https://github.com/<org>/tabibi-web) | Front web, tous les rôles | Angular 18.2 (standalone, signaux, SSR), angular-oauth2-oidc, Karma / Jasmine, image Node | v0.21.0, 23 commits, 286 specs + 16 tests Playwright |
 | [`tabibi-mobile`](https://github.com/<org>/tabibi-mobile) | Application patient Android et iOS | Flutter 3 (Dart >= 3.5), flutter_appauth, http | v0.13.0, 14 commits, CI avec APK |
-| `tabibi-infra-docs` (ce dépôt) | Documentation vivante, environnement de dev, copie du realm Keycloak, diagrammes, **tests d'intégration réels des trois briques** | Docker Compose, Keycloak 26, Mermaid, Node 20 | 24 diagrammes, 8 documents, scénario d'intégration |
+| `tabibi-infra-docs` (ce dépôt) | Documentation vivante, environnement de dev, copie du realm Keycloak, diagrammes, **tests d'intégration réels des trois briques** | Docker Compose, Keycloak 26, Mermaid, Node 20 | 24 diagrammes, 8 documents, scénario d'intégration (20 étapes) + contrôle du web (5), workflow `integration` |
 
 Remplacer `<org>` par l'organisation GitHub qui héberge les dépôts.
 
@@ -140,6 +140,12 @@ Hash = commit qui a livré la fonctionnalité (voir [docs/JOURNAL.md](docs/JOURN
 | CI : publication sur GHCR, Dependabot | v0.21.0 `1de20fb` | v0.18.0 `40410ff` | v0.13.0 `40bc155` (APK, stores) |
 | Durcissement du realm Keycloak, realm de production | v0.22.0 `ae58723` | — | — |
 | Rendu côté serveur des pages publiques (SSR) | — | v0.19.0 `fea168b` | — |
+| Orchestration : `DOMAINE` transmis au service `web`, versions alignées sur le journal | v0.22.1 `d14bc9f` | v0.19.1 `359d1cb` | — |
+| Ordonnance imprimable (PDF avec QR code de vérification) | v0.23.0 `799efd3` | impression navigateur depuis v0.4.0 | — |
+| Limitation de débit sur les points publics (429, `Retry-After`) | v0.24.0 `8e9e288` | — | — |
+| Référencement : titres, descriptions, page 404, `robots.txt`, `sitemap.xml` | — | v0.20.0 `09006fc` | — |
+| Scénario de bout en bout dans le dépôt (API simulée ou adaptateurs en mémoire, sans Docker) | v0.24.1 `7736cba` (`ScenarioApiTest`) | v0.21.0 `deb1202` (Playwright, 16 tests) | — |
+| Tests d'intégration réels des trois briques (pile Docker, scénario API, rendu serveur du web) et CI dédiée | infra-docs `22e4529`, `faf9156` (scénario contre l'API réelle, PDF compris) | infra-docs `ad31ea1` (image web face à l'API réelle) | pas encore (pas d'émulateur en CI) |
 
 ## Ce qu'il reste à faire
 
@@ -147,14 +153,17 @@ Détail et priorités dans [docs/SECURITE.md](docs/SECURITE.md) (section 5) et [
 
 1. **Avant la production** : conformité loi 18-07 / RGPD (information, consentements, droits, localisation des
    données), chiffrement au repos et des sauvegardes, restauration testée, MFA imposée aux administrateurs et
-   médecins, test d'intrusion, durcissement du serveur, transmission de `DOMAINE` au service `web` du compose de
-   production, pousser sur la branche `main` (la CI ne publie les images que depuis `main`).
+   médecins, test d'intrusion, durcissement du serveur, pousser sur la branche `main` (la CI ne publie les images
+   que depuis `main`), renseigner la variable de dépôt `ORG_GITHUB` pour que la CI d'intégration clone les bons dépôts.
 2. **Fonctionnel** : SMS / e-mail (adaptateurs du port `Notifieur`), nom du patient dans les écrans du cabinet,
    sélecteur de wilayas, écran du journal des accès, annulation d'une ordonnance, export et effacement d'un compte,
    purge du journal des accès.
 3. **Mobile** : stockage sécurisé et rafraîchissement du jeton, notifications push, icône et écran de lancement,
    signature release depuis la CI, publication sur les stores.
-4. **Plus tard** : titre et description par page pour le référencement, instance Jitsi dédiée, base managée puis plusieurs instances
+4. **Tests** : brancher les tests Playwright du web (aujourd'hui sur une API simulée) sur la pile réelle de la CI
+   d'intégration, qui n'appelle le web qu'avec `curl` ; connexion OIDC réelle dans un navigateur ; tests mobiles
+   contre l'API réelle.
+5. **Plus tard** : instance Jitsi dédiée, base managée puis plusieurs instances
    (voir [docs/DEPLOIEMENT.md](docs/DEPLOIEMENT.md)).
 
 ## Contenu de ce dépôt

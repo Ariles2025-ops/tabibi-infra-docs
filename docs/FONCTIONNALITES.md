@@ -29,6 +29,7 @@ est réservée aux patients), **API seulement** (aucun écran ne l'expose encore
 | Être prévenu : rendez-vous confirmé, annulé par le cabinet, rappel la veille, créneau disponible, message, réponse de pharmacie, téléconsultation | `Notifieur` (canal interne) | cloche + `/notifications` | `MesNotificationsPage`, compteur sur l'accueil | Fait (canal interne) ; SMS et e-mail à faire |
 | Lire mes notifications, marquer lue, tout marquer lu | `GET /api/notifications/mes`, `GET .../non-lues/nombre`, `POST .../{id}/lue`, `POST .../toutes-lues` | `/notifications` | `MesNotificationsPage` | Fait |
 | Mes ordonnances, détail (médicaments, posologie, durée), code de vérification | `GET /api/ordonnances/mes`, `GET /api/ordonnances/{id}` | `/mes-ordonnances`, `/ordonnances/:id` (impression) | `MesOrdonnancesPage`, `DetailOrdonnancePage` (copier le code) | Fait |
+| Télécharger l'ordonnance en PDF (QR code vers la vérification publique) | `GET /api/ordonnances/{id}/pdf` (backend v0.23.0) | pas encore de bouton | pas encore | API seulement |
 | Téléconsultation : donner mon consentement puis rejoindre la salle vidéo | `GET /api/teleconsultations/mes`, `GET /api/teleconsultations/{id}`, `POST /api/teleconsultations/{id}/consentir` | `/teleconsultations` | `MesTeleconsultationsPage` (navigateur externe) | Fait |
 | Écrire à un médecin déjà consulté, lire et envoyer des messages | `POST /api/conversations`, `GET /api/conversations`, `GET /api/conversations/{id}/messages`, `POST /api/conversations/{id}/messages` | `/medecins/:id` (« Écrire au médecin »), `/messagerie`, `/messagerie/:id` | `FicheMedecinPage`, `MesConversationsPage`, `ConversationPage` | Fait |
 | Donner mon avis (note 1 à 5, commentaire) après un rendez-vous honoré ; voir mes avis | `POST /api/avis`, `GET /api/avis/mes` | `/mes-rendez-vous` (« Donner mon avis »), `/avis/nouveau/:rendezVousId`, `/mes-avis` | `MesRendezVousPage`, `DeposerAvisPage`, `MesAvisPage` | Fait |
@@ -91,7 +92,25 @@ est réservée aux patients), **API seulement** (aucun écran ne l'expose encore
 | Rappel de rendez-vous 24 h avant, une seule fois par rendez-vous confirmé, toutes les heures | `PlanificateurRappels`, `RappelService`, `TABIBI_RAPPELS_ACTIFS` | Fait |
 | Alerte de la liste d'attente quand un créneau s'ouvre ou se libère | port `AlerteCreneau`, `ListeAttenteService` | Fait |
 | Journal des accès à l'API (qui, quoi, quand, statut, IP tronquée) | `FiltreAudit`, table `journal_acces` | Fait (purge à prévoir) |
+| Limitation de débit des points publics (annuaire, vérification, publications) : 429 et `Retry-After` | `FiltreLimiteDebit`, `LimiteurDebit`, `tabibi.limite-debit.*` (backend v0.24.0) | Fait (par instance) |
+| Référencement des pages publiques : titres, descriptions, 404, `robots.txt`, `sitemap.xml` | web v0.20.0 (`SeoService`, `server.ts`) | Fait |
 | Sauvegarde quotidienne des bases | `infra/sauvegarde/pg_dump.sh` (cron à planifier) | Fait (script) |
+
+## Ce qui est vérifié automatiquement (tests)
+
+| Niveau | Où | Ce qui est prouvé |
+|---|---|---|
+| Unitaire et tranche web, backend | `tabibi-backend`, `mvn test` (54 classes) : domaine, services avec faux ports, `@WebMvcTest` avec `SecurityConfig` | règles métier, transitions, 401 / 403 par rôle, codes HTTP ; `RealmKeycloakTest` : le realm versionné est conforme |
+| Scénario de bout en bout, backend | `ScenarioApiTest` (`@SpringBootTest`, adaptateurs en mémoire, `JwtDecoder` simulé, backend v0.24.1) | application complète sans base : parcours créneau, réservation, notifications, honoré, avis, ordonnance, vérification, PDF réel, 429 |
+| Intégration base, backend | `mvn verify -Dit.docker=true` (Testcontainers PostgreSQL) | requêtes JPA non triviales sur un vrai PostgreSQL |
+| Specs, web | `tabibi-web`, `ng test` (286 specs) : services avec `HttpTestingController`, composants avec services factices | écrans, formulaires, gardes de rôle, configuration, garde-fous du rendu serveur |
+| Bout en bout navigateur, web | `npm run e2e` (Playwright, 16 tests, web v0.21.0) sur le build de production servi par `server.ts` face à une API simulée | pages publiques rendues et hydratées, 404, `robots.txt`, `sitemap.xml`, titres, redirection vers la connexion |
+| Tests, mobile | `tabibi-mobile`, `flutter test` : modèles, utilitaires, pages avec `FakeApiService` | écrans patient, tolérance des modèles |
+| **Intégration réelle des trois briques** | `tabibi-infra-docs`, `integration/lancer.sh` puis `verifier-web.sh` ; workflow `integration` (push, pull request, hebdomadaire) | API construite depuis les sources en profil `postgres` (Liquibase sur PostgreSQL 16), jetons du vrai Keycloak 26 acceptés avec les rôles, parcours complet (créneau, candidature validée, annuaire, réservation 201 / 409, notifications, honoré, avis et synthèse publique, ordonnance, vérification publique et PDF, 401 / 403), image web dont le rendu serveur appelle la vraie API (`/`, fiche, `config.json`, CSP) |
+
+Pas encore : navigateur contre l'API réelle (Playwright tourne sur une API simulée) et connexion OIDC réelle,
+application mobile contre l'API réelle, charge, restauration d'une sauvegarde (voir [DEPLOIEMENT.md](DEPLOIEMENT.md),
+section 16).
 
 ## Ce qui n'existe pas encore
 
@@ -100,6 +119,6 @@ est réservée aux patients), **API seulement** (aucun écran ne l'expose encore
 - Écran d'administration du journal des accès ; annulation d'une ordonnance ; export et effacement d'un compte
   (droits des personnes) ; durée de conservation appliquée.
 - Espaces médecin, secrétaire, pharmacie et administrateur sur mobile (choix : application patient d'abord).
-- Titre et description par page pour le référencement (le rendu côté serveur des pages publiques existe depuis
-  web v0.19.0) ; stockage sécurisé et rafraîchissement du jeton sur mobile ; icône et écran de lancement de
-  l'application ; instance Jitsi dédiée ; paiement en ligne (non prévu).
+- Bouton de téléchargement du PDF de l'ordonnance sur le web et le mobile (l'API le fournit depuis backend v0.23.0) ;
+  stockage sécurisé et rafraîchissement du jeton sur mobile ; icône et écran de lancement de l'application ;
+  instance Jitsi dédiée ; paiement en ligne (non prévu).

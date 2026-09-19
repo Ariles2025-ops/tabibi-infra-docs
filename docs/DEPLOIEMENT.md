@@ -247,12 +247,8 @@ Changer d'hébergeur à n'importe quelle étape : sauvegarde, nouveau serveur, `
 1. **Le service `web` doit recevoir `DOMAINE`** (ou `TABIBI_API_URL`, `TABIBI_KEYCLOAK_ISSUER`,
    `TABIBI_KEYCLOAK_CLIENT_ID`) : l'image de `tabibi-web` en dérive `assets/config.json`, la configuration du rendu
    serveur et la CSP. Le serveur de rendu appelle l'API par son URL publique (`https://api.DOMAINE`), qui doit donc
-   être joignable depuis le conteneur. Dans `docker-compose.prod.yml` du backend, ajouter au service `web` :
-   ```yaml
-   environment:
-     DOMAINE: ${DOMAINE}
-   ```
-   Sans cela, le front retombe sur les adresses `localhost` du poste de développement.
+   être joignable depuis le conteneur. `docker-compose.prod.yml` le transmet depuis backend v0.22.1 (`d14bc9f`) ;
+   sans cette variable, le front retombe sur les adresses `localhost` du poste de développement.
 2. **Branche `main`** : les workflows publient l'image seulement sur `refs/heads/main` ; les dépôts locaux sont
    aujourd'hui sur `master`. Pousser sur `main` (`git branch -M main`) ou adapter le `if` des workflows.
 3. **Paquets GHCR privés par défaut** : rendre les paquets publics ou faire `docker login ghcr.io` sur le serveur.
@@ -282,8 +278,9 @@ Ce qu'elle **ne prouve pas** (à vérifier autrement) :
 
 - Caddy, les certificats, `KC_HOSTNAME` avec un vrai domaine, `SERVER_FORWARD_HEADERS_STRATEGY=native` derrière le
   proxy, les images GHCR (la CI construit depuis les sources) : c'est la section 8 de ce guide, sur le serveur.
-- La connexion **depuis un navigateur** (redirection OIDC, PKCE, hydratation Angular, CORS réel) : la CI n'appelle le
-  web qu'avec `curl` ; un test navigateur reste à écrire (Playwright, par exemple).
+- La connexion **depuis un navigateur** (redirection OIDC, PKCE, CORS réel) : la CI n'appelle le web qu'avec `curl` ;
+  les tests Playwright de `tabibi-web` (v0.21.0) couvrent l'hydratation et les pages publiques, mais sur une API
+  simulée ; les brancher sur cette pile réelle est la suite logique.
 - L'application mobile : elle parle la même API (`ApiService`), mais aucun émulateur ne tourne en CI.
 - Les rappels planifiés, les SMS / e-mails (adaptateurs absents), la charge, la restauration d'une sauvegarde.
 

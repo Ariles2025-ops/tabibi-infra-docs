@@ -4,8 +4,9 @@
 > ce journal-ci les fusionne en une seule chronologie, avec le dépôt, la version, le hash du commit et un résumé,
 > pour voir d'un coup d'oeil comment le produit a été construit et retrouver le commit d'une fonctionnalité. Le
 > détail (règles métier, endpoints, tests) reste dans le journal du dépôt concerné. Ordre chronologique des commits
-> (dates UTC), état au 19 septembre 2026 : backend 23 commits (v0.22.0), web 20 commits (v0.19.0), mobile 14 commits
-> (v0.13.0), infra-docs.
+> (dates UTC), état au 19 septembre 2026 (recompté par `git rev-list --count HEAD` à cette date) : backend 27 commits
+> (v0.24.1), web 23 commits (v0.21.0), mobile 14 commits (v0.13.0), infra-docs 16 commits. D'autres commits arrivent en
+> parallèle dans les dépôts de code : recompter (`git rev-list --count HEAD`) avant de citer ces chiffres.
 
 ## Comment lire
 
@@ -82,12 +83,27 @@
 | 2026-09-19 | web | v0.17.0 | `92bcfa7` | Image Docker : nginx avec `assets/config.json` et CSP générés au démarrage (`TABIBI_*` ou `DOMAINE`), cache immuable des bundles, en-têtes de sécurité, `outputHashing` |
 | 2026-09-19 | web | v0.18.0 | `40410ff` | CI : publication de l'image `ghcr.io/<org>/tabibi-web` (`latest`, `sha-<commit>`) après `build-test`, Dependabot |
 | 2026-09-19 | web | v0.19.0 | `fea168b` | Rendu côté serveur des pages publiques (`@angular/ssr`, `server.ts` express avec secours sans rendu, hydratation et cache de transfert), garde-fous hors navigateur, image `node:20-alpine` à la place de nginx, 271 specs |
-| 2026-09-19 | infra | — | (ce dépôt) | Documentation complète : architecture avec diagrammes, choix techniques, sécurité, déploiement, guide du développeur, fonctionnalités, journal global, realm à jour |
+| 2026-09-19 | infra | — | `36dc63c`..`f494352` | Documentation complète : architecture avec diagrammes, choix techniques, sécurité, déploiement, guide du développeur, fonctionnalités, journal global, realm à jour |
+| 2026-09-19 | backend | v0.22.1 | `d14bc9f` | Correctif orchestration : `docker-compose.prod.yml` transmet `DOMAINE` au service `web` (l'image en dérive l'URL de l'API et de Keycloak pour `assets/config.json` et sa CSP) ; `pom.xml` aligné sur le journal (0.22.x) |
+| 2026-09-19 | web | v0.19.1 | `359d1cb` | Version alignée : `package.json` / `package-lock.json` en 0.19.x |
+| 2026-09-19 | backend | v0.23.0 | `799efd3` | Ordonnance imprimable : `GET /api/ordonnances/{id}/pdf` (patient destinataire ou médecin auteur), OpenPDF + ZXing (QR code vers `/verifier?code=`), `TABIBI_WEB_BASE_URL`, port `GenerateurPdfOrdonnance` |
+| 2026-09-19 | web | v0.20.0 | `09006fc` | Référencement : `SeoService` (titre, description, canonique, `noindex` des pages privées), route `**` en 404 côté serveur, `robots.txt` et `sitemap.xml` servis par `server.ts`, 286 specs |
+| 2026-09-19 | backend | v0.24.0 | `8e9e288` | Limitation de débit sur les points publics : `LimiteurDebit` (seau à jetons par IP), `FiltreLimiteDebit` avant Spring Security (429 `{ erreur }` + `Retry-After`), quotas `tabibi.limite-debit.*` (annuaire 120/min, vérification 30/min, publications 20/min) |
+| 2026-09-19 | web | v0.21.0 | `deb1202` | Tests de bout en bout Playwright (16) sur le build de production servi par `server.ts` face à une API et un issuer simulés : recherche, vérification, navigation (404, `robots.txt`, `sitemap.xml`, titres, `noindex`) ; job CI `e2e` |
+| 2026-09-19 | backend | v0.24.1 | `7736cba` | `ScenarioApiTest` (`@SpringBootTest`, adaptateurs en mémoire, `JwtDecoder` simulé) : parcours créneau, réservation, notifications, honoré, avis, ordonnance, vérification, PDF, 429 ; trois niveaux de tests documentés |
+| 2026-09-19 | infra | — | `22e4529` | Tests d'intégration réels : `integration/docker-compose.integration.yml` (PostgreSQL 16, Keycloak 26 avec le realm du backend, API construite depuis `tabibi-backend` en profil `postgres`), `scenario-api.mjs` (jetons Keycloak réels, 19 étapes du parcours créneau, candidature validée, réservation, notification, honoré, avis, ordonnance, 401 / 403 / 409), `lancer.sh` |
+| 2026-09-19 | infra | — | `ad31ea1` | CI d'intégration `.github/workflows/integration.yml` (push `main`, pull request, manuel, hebdomadaire) : clone des dépôts de code, pile réelle et scénario, image web lancée face à l'API réelle, `verifier-web.sh` (config, `/` et fiche rendues côté serveur avec les praticiens de l'API, CSP), journaux en artefact |
+| 2026-09-19 | infra | — | `faf9156` | Scénario : étape PDF de l'ordonnance imprimable (`application/pdf`, `%PDF-`), sautée si l'API est antérieure à v0.23.0 |
+| 2026-09-19 | infra | — | (ce commit) | Journal, tableau d'avancement, fonctionnalités et sécurité mis à jour pour la vague intégration et les derniers commits du backend (v0.22.1 à v0.24.0) et du web (v0.19.1, v0.20.0) |
 
 ## Ce que dit ce journal
 
-- **57 commits** de fonctionnalités en deux jours : 23 backend, 20 web, 14 mobile, plus ce dépôt.
+- **64 commits** en deux jours : 27 backend, 23 web, 14 mobile, plus ce dépôt (16).
 - Chaque fonctionnalité a été livrée **API d'abord**, puis web, puis mobile pour le patient, avec ses tests et
   son entrée de journal : la trace est complète du besoin au commit.
 - Les derniers commits du backend et du web sont consacrés à la **mise en production** (images, orchestration,
   registre, durcissement, rendu côté serveur) ; le mobile est prêt pour les stores (CI, signature documentée).
+- La **vague intégration** ajoute trois niveaux de preuve : dans chaque dépôt, un scénario de bout en bout sans
+  Docker (`ScenarioApiTest` côté backend, Playwright sur une API simulée côté web) ; dans ce dépôt, la pile réelle
+  en Docker (API construite depuis les sources, PostgreSQL, Keycloak, vrais jetons) et le front web rendu côté
+  serveur face à la vraie API, rejoués par GitHub Actions à chaque changement et chaque semaine.

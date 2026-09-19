@@ -195,8 +195,9 @@ Par ordre de priorité, avec une formulation volontairement prudente sur le droi
 6. **Durcissement du serveur** : accès SSH par clé seulement, pare-feu (seuls 22, 80, 443), mises à jour
    automatiques de sécurité, `fail2ban` sur SSH, supervision et alertes (espace disque, `/actuator/health`,
    expiration des certificats), journaux centralisés sans donnée de santé.
-7. **Limitation de débit** sur les endpoints publics (annuaire, vérification d'ordonnance) et sur Keycloak,
-   au niveau de Caddy ou d'un pare-feu applicatif.
+7. **Limitation de débit** : l'API limite depuis v0.24.0 (`8e9e288`) les points publics par adresse IP (annuaire
+   120/min, vérification d'ordonnance 30/min, publications 20/min ; 429 et `Retry-After`), par instance ; reste à
+   protéger Keycloak (page de connexion, endpoint de jeton) au niveau de Caddy ou d'un pare-feu applicatif.
 8. **Rétention du journal des accès** : la table `journal_acces` n'est jamais purgée ; ajouter une suppression
    périodique (par exemple au-delà d'un an) et une politique d'accès à ce journal.
 9. **Mobile** : stocker le jeton dans `flutter_secure_storage` (dépendance présente, non utilisée : le jeton est

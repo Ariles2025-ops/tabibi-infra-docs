@@ -28,7 +28,7 @@
 |---|---|
 | **Sécurité d'abord** | Les données manipulées sont des données de patients. L'identité est déléguée à Keycloak (OIDC, PKCE, MFA possible), l'API valide un JWT à chaque requête, l'autorisation se joue côté serveur (rôle puis règle de propriétaire), les journaux et les notifications ne contiennent jamais de donnée de santé. |
 | **Portabilité** | JPA + Liquibase (base remplaçable), tout est conteneurisé (hébergeur remplaçable), configuration par variables d'environnement, aucune dépendance à un service propriétaire. |
-| **Testabilité** | Chaque fonctionnalité arrive avec ses tests : domaine, service, tranche web (401 / 403 / codes HTTP), intégration PostgreSQL (Testcontainers), specs Angular, tests Flutter. |
+| **Testabilité** | Chaque fonctionnalité arrive avec ses tests : domaine, service, tranche web (401 / 403 / codes HTTP), intégration PostgreSQL (Testcontainers), specs Angular, tests Flutter ; et l'ensemble est prouvé par la pile d'intégration réelle de `tabibi-infra-docs` (API + Keycloak + PostgreSQL + web, workflow `integration`). |
 | **Clarté** | Architecture hexagonale, un module par domaine métier, nommage en français, un commit par fonctionnalité, journal tenu dans chaque dépôt. |
 | **Progressivité** | On construit fonctionnalité par fonctionnalité, on déploie sur un serveur unique, on peut grandir sans réécrire (voir [DEPLOIEMENT.md](DEPLOIEMENT.md)). |
 
