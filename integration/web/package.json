@@ -1,0 +1,12 @@
+{
+  "name": "tabibi-integration-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Verification du front web Tabibi dans un vrai navigateur (Playwright) face a la pile d'integration reelle",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.0"
+  }
+}

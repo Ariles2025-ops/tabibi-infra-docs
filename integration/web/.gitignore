@@ -1,0 +1,6 @@
+# Dependances et sorties de Playwright : jamais commitees (rapport et captures sont publies en artefacts par la CI).
+node_modules/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
