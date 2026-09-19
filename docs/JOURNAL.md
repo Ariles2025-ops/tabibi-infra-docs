@@ -95,14 +95,25 @@
 | 2026-09-19 | infra | — | `ad31ea1` | CI d'intégration `.github/workflows/integration.yml` (push `main`, pull request, manuel, hebdomadaire) : clone des dépôts de code, pile réelle et scénario, image web lancée face à l'API réelle, `verifier-web.sh` (config, `/` et fiche rendues côté serveur avec les praticiens de l'API, CSP), journaux en artefact |
 | 2026-09-19 | infra | — | `faf9156` | Scénario : étape PDF de l'ordonnance imprimable (`application/pdf`, `%PDF-`), sautée si l'API est antérieure à v0.23.0 |
 | 2026-09-19 | infra | — | (ce commit) | Journal, tableau d'avancement, fonctionnalités et sécurité mis à jour pour la vague intégration et les derniers commits du backend (v0.22.1 à v0.24.0) et du web (v0.19.1, v0.20.0) |
+| 2026-09-19 | web | v0.22.0 | `ed04e89` | Ordonnance imprimable côté web : `GET /api/ordonnances/{id}/pdf` en blob, bouton « Télécharger le PDF » sur le détail (patient et médecin), garde hors navigateur |
+| 2026-09-19 | mobile | v0.14.0 | `4520483` | Ordonnance imprimable côté mobile : téléchargement du PDF, enregistrement temporaire et ouverture par l'application du téléphone (`path_provider`, `open_filex`) |
+| 2026-09-19 | backend | v0.25.0 | `c25eb26` | Messages d'API et notifications en français, arabe et anglais : `Langue` (`Accept-Language`), catalogue `messages/{fr,ar,en}.properties` (75 clés), erreurs métier à clés traduites par `GestionErreursApi`, notifications rendues dans la langue du profil du destinataire (port `LanguePreferee`) |
+| 2026-09-19 | backend | v0.26.0 | `896c596` | Données personnelles : `GET /api/moi/donnees` (export complet en pièce jointe) et `DELETE /api/moi/compte` (confirmation obligatoire, effacement du profil, des notifications, des avis et messages anonymisés, rendez-vous conservés pour la traçabilité médicale) ; suppression du compte Keycloak documentée |
+| 2026-09-19 | backend | v0.27.0 | `0ebb07a`, `5a3cebc` | Supervision : Micrometer/Prometheus réservé au rôle ADMIN, compteurs métier (réservations, annulations, ordonnances, téléconsultations, avis, dépassements de débit) derrière un port `Compteurs`, journalisation structurée avec identifiant de requête |
+| 2026-09-19 | web | v0.23.0 | `4b5ca61` | Interface en français, arabe et anglais : service de traduction à l'exécution (signal + dictionnaires de ~430 clés), pipes `t` et `dateLocale`, `lang`/`dir` corrects jusqu'au rendu serveur (`Accept-Language`), styles RTL, sélecteur de langue, titres et descriptions traduits ; 331 specs, 19 tests de bout en bout |
+| 2026-09-19 | mobile | v0.15.0 | `defce12` | Interface en français, arabe et anglais : dictionnaires de 250 clés, `LangueScope` et `t(...)`, `MaterialApp` localisée (RTL par la locale), dates `intl`, écran « Langue », langue initialisée depuis le profil |
+| 2026-09-19 | infra | — | (ce commit) | Journal complété pour la vague « impression, langues, données personnelles et supervision » |
 
 ## Ce que dit ce journal
 
-- **64 commits** en deux jours : 27 backend, 23 web, 14 mobile, plus ce dépôt (16).
+- **89 commits** en deux jours : 31 backend, 25 web, 16 mobile, plus ce dépôt (17).
 - Chaque fonctionnalité a été livrée **API d'abord**, puis web, puis mobile pour le patient, avec ses tests et
   son entrée de journal : la trace est complète du besoin au commit.
 - Les derniers commits du backend et du web sont consacrés à la **mise en production** (images, orchestration,
   registre, durcissement, rendu côté serveur) ; le mobile est prêt pour les stores (CI, signature documentée).
+- La **dernière vague** ajoute l'ordonnance imprimable (PDF avec QR code de vérification), l'interface et les
+  messages en **français, arabe et anglais** (avec mise en page de droite à gauche), l'**export et l'effacement
+  des données personnelles**, ainsi que la **supervision** (métriques Prometheus, compteurs métier, journal structuré).
 - La **vague intégration** ajoute trois niveaux de preuve : dans chaque dépôt, un scénario de bout en bout sans
   Docker (`ScenarioApiTest` côté backend, Playwright sur une API simulée côté web) ; dans ce dépôt, la pile réelle
   en Docker (API construite depuis les sources, PostgreSQL, Keycloak, vrais jetons) et le front web rendu côté
