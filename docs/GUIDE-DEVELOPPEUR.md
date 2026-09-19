@@ -15,13 +15,14 @@
 7. [Conventions de commit](#7-conventions-de-commit)
 8. [Lire et tenir le journal](#8-lire-et-tenir-le-journal)
 9. [Regénérer les diagrammes de ce dépôt](#9-regénérer-les-diagrammes-de-ce-dépôt)
+10. [Tests d'intégration des trois briques](#10-tests-dintégration-des-trois-briques)
 
 ## 1. Outils à installer
 
 | Outil | Version | Pour |
 |---|---|---|
 | Git | récent | tous les dépôts |
-| Docker Engine + Compose v2 | récent | PostgreSQL et Keycloak en local, test d'intégration Testcontainers, images |
+| Docker Engine + Compose v2 | récent | PostgreSQL et Keycloak en local, test d'intégration Testcontainers, images, pile d'intégration réelle (section 10) |
 | JDK Temurin | 21 | backend |
 | Maven | 3.9 | backend (`mvn`) |
 | Node.js + npm | 20 | web |
@@ -226,3 +227,61 @@ PUPPETEER_CONFIG=/chemin/pupp.json docs/diagrammes/generer.sh
 
 Règles pour les diagrammes : thème commun (en-tête `%%{init ...}%%` de chaque fichier), aucun emoji, un diagramme
 par idée (couper plutôt que densifier), vérifier le PNG après génération, commiter la source et les images ensemble.
+
+## 10. Tests d'intégration des trois briques
+
+**Pourquoi.** Les tests des dépôts sont unitaires ou simulés (`@WebMvcTest` avec un jeton factice, specs Angular avec
+des services factices, `FakeApiService` sur mobile) : aucun ne prouve que l'API en conteneur, avec sa base PostgreSQL
+migrée par Liquibase, accepte les jetons du vrai Keycloak et enchaîne les cas d'usage de bout en bout. Le dossier
+`integration/` de ce dépôt le fait, avec les images et le realm de production, sans simulateur.
+
+**Ce qu'il contient.**
+
+| Fichier | Rôle |
+|---|---|
+| `integration/docker-compose.integration.yml` | `postgres:16-alpine`, `quay.io/keycloak/keycloak:26.0` (`start-dev --import-realm`, realm `../tabibi-backend/infra/keycloak/tabibi-realm.json` monté seul, `KC_HOSTNAME=http://localhost:8081`), API construite depuis `../tabibi-backend` (`build: context`, profil `postgres`, datasource `postgres:5432/tabibi`, émetteur `http://localhost:8081/realms/tabibi`, clés lues en interne sur `keycloak:8080`), ports 8080 et 8081 publiés, `healthcheck` sur chaque service |
+| `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 19 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec |
+| `integration/lancer.sh` | `docker compose up -d --build`, attente de Keycloak et de l'API, scénario, journaux des conteneurs en cas d'échec, `down -v` |
+
+**Le parcours vérifié** (dans l'ordre) : jetons et émetteur ; `GET /api/moi` (sujet et rôle de chaque compte) ; 401
+sans jeton ; le médecin ouvre un créneau (`POST /api/medecin/creneaux`, 201) **sans être dans l'annuaire** (en profil
+`postgres` l'annuaire démarre vide : ouvrir un créneau n'exige pas d'y être publié) ; le patient voit le créneau ;
+publication du médecin : `GET /api/medecins/{id}` répond 404, alors candidature (`POST /api/medecin/candidature`)
+puis validation par `admin.demo` (`POST /api/admin/candidatures/{id}/valider`), fiche publique 200 et notification
+« Candidature validee » ; l'annuaire public liste le médecin ; réservation (`POST /api/creneaux/{id}/reserver`, 201) ;
+le créneau n'est plus proposé et une seconde réservation répond 409 `{ erreur }` ; `GET /api/rendezvous/mes` ;
+notifications du patient (« Rendez-vous confirme ») et du médecin (« Nouveau rendez-vous ») ; le médecin honore ;
+avis (`POST /api/avis`, 201, sans identifiant du patient dans la vue) ; synthèse publique sans jeton (l'avis y est,
+anonyme) ; ordonnance (`POST /api/ordonnances`, 201) visible du patient ; vérification publique du code (200, 404 pour
+un code inconnu) ; refus 403 du patient sur `/api/admin/statistiques` et sur `POST /api/medecin/creneaux`, 200 pour
+l'administrateur.
+
+**Lancer.**
+
+```bash
+# tabibi-backend cloné à côté de ce dépôt (../tabibi-backend) ; Docker, Compose v2, Node 20, curl
+integration/lancer.sh                                  # 5 à 10 minutes la première fois (construction de l'image)
+GARDER_LA_PILE=1 integration/lancer.sh                 # laisse la pile en route pour l'explorer (Swagger, Keycloak)
+docker compose -f integration/docker-compose.integration.yml down -v      # puis l'arrêter
+TABIBI_BACKEND_DIR=/chemin/tabibi-backend integration/lancer.sh           # sources ailleurs
+node integration/scenario-api.mjs                      # le scénario seul, contre une pile déjà démarrée
+```
+
+Variables : `TABIBI_BACKEND_DIR` (défaut `../tabibi-backend` à côté de ce dépôt), `TABIBI_API_URL`
+(`http://localhost:8080`), `TABIBI_KEYCLOAK_ISSUER` (`http://localhost:8081/realms/tabibi`), `TABIBI_ATTENTE_S`
+(attente maximale du démarrage, 240 s). La pile publie les mêmes ports que le `docker-compose.yml` de développement :
+arrêter celui-ci avant.
+
+**Émetteur des jetons.** Keycloak inscrit dans chaque jeton l'URL par laquelle il est appelé, sauf si `KC_HOSTNAME`
+la fixe : la pile la fixe à `http://localhost:8081`, l'API attend ce même émetteur et lit les clés de signature sur le
+réseau interne (`keycloak:8080`), exactement comme `docker-compose.prod.yml` (émetteur public, clés en interne). Le
+scénario vérifie la revendication `iss` de chaque jeton avant d'appeler l'API.
+
+**Le scénario est rejouable** sur une pile conservée : la fiche déjà publiée est réutilisée, un nouveau créneau et
+un nouveau rendez-vous sont créés, la synthèse compte un avis de plus. Il fonctionne aussi contre
+`mvn spring-boot:run` (profil en mémoire, annuaire seedé : l'étape de candidature est alors sautée) avec le
+`docker-compose.yml` de développement.
+
+**Ajouter une étape** : une fonction `etape('Libellé', async () => { ... })` avec `appelAttendu(méthode, chemin,
+statut, { jeton, corps })` et `verifier(condition, message)` ; garder l'ordre du parcours (chaque étape s'appuie sur
+l'état `etat` des précédentes) et ne jamais dépendre d'un compte autre que les trois comptes de démonstration.

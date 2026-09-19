@@ -18,7 +18,7 @@ médecin, secrétaire, pharmacie, administrateur.
 | [`tabibi-backend`](https://github.com/<org>/tabibi-backend) | API métier, orchestration de production (`docker-compose.prod.yml`, `infra/`) | Spring Boot 3.4.1 / Java 21, Spring Security + Keycloak JWT, JPA, Liquibase, PostgreSQL 16 | v0.22.0, 23 commits, 17 modules, 16 changelogs, 50 classes de test |
 | [`tabibi-web`](https://github.com/<org>/tabibi-web) | Front web, tous les rôles | Angular 18.2 (standalone, signaux, SSR), angular-oauth2-oidc, Karma / Jasmine, image Node | v0.19.0, 20 commits, 271 specs |
 | [`tabibi-mobile`](https://github.com/<org>/tabibi-mobile) | Application patient Android et iOS | Flutter 3 (Dart >= 3.5), flutter_appauth, http | v0.13.0, 14 commits, CI avec APK |
-| `tabibi-infra-docs` (ce dépôt) | Documentation vivante, environnement de dev, copie du realm Keycloak, diagrammes | Docker Compose, Keycloak 26, Mermaid | 24 diagrammes, 8 documents |
+| `tabibi-infra-docs` (ce dépôt) | Documentation vivante, environnement de dev, copie du realm Keycloak, diagrammes, **tests d'intégration réels des trois briques** | Docker Compose, Keycloak 26, Mermaid, Node 20 | 24 diagrammes, 8 documents, scénario d'intégration |
 
 Remplacer `<org>` par l'organisation GitHub qui héberge les dépôts.
 
@@ -85,6 +85,24 @@ curl -s -X POST http://localhost:8081/realms/tabibi/protocol/openid-connect/toke
 Tester : `mvn test` (backend), `npx ng test --watch=false --browsers=ChromeHeadlessCI` (web),
 `flutter test` (mobile). Détails dans [docs/GUIDE-DEVELOPPEUR.md](docs/GUIDE-DEVELOPPEUR.md).
 
+## Tests d'intégration réels (API + Keycloak + PostgreSQL)
+
+Les tests de chaque dépôt sont unitaires ou simulés. Ce dépôt ajoute la vérification **réelle** de l'ensemble :
+`integration/lancer.sh` construit l'image de l'API depuis les sources de `tabibi-backend`, démarre PostgreSQL 16 et
+Keycloak 26 (realm et comptes de démonstration importés), attend que tout réponde, puis `integration/scenario-api.mjs`
+obtient de vrais jetons et déroule un parcours complet : identité et rôles, ouverture d'un créneau, candidature du
+médecin validée par l'administrateur, réservation, notification, rendez-vous honoré, avis et synthèse publique,
+ordonnance et vérification publique, refus 401 / 403. Chaque étape affiche `OK` ou `ECHEC` ; la pile est détruite à
+la fin (`down -v`).
+
+```bash
+# tabibi-backend cloné à côté de ce dépôt ; Docker, Compose v2 et Node 20 installés
+integration/lancer.sh
+```
+
+Détails, variables et exploration de la pile dans [docs/GUIDE-DEVELOPPEUR.md](docs/GUIDE-DEVELOPPEUR.md)
+(section « Tests d'intégration des trois briques »).
+
 ## État d'avancement
 
 Hash = commit qui a livré la fonctionnalité (voir [docs/JOURNAL.md](docs/JOURNAL.md)).
@@ -138,6 +156,8 @@ Détail et priorités dans [docs/SECURITE.md](docs/SECURITE.md) (section 5) et [
 README.md                      cette page
 CONTRIBUTING.md                règles de contribution
 docker-compose.yml             PostgreSQL 16 + Keycloak 26 pour le développement (identique à celui du backend)
+integration/                   tests d'intégration réels : pile Docker (docker-compose.integration.yml),
+                               scénario API (scenario-api.mjs), lanceur (lancer.sh)
 infra/keycloak/tabibi-realm.json   copie du realm de développement (source de vérité : tabibi-backend)
 docs/*.md                      les documents listés plus haut
 docs/architecture-cible.html   la version HTML autonome
