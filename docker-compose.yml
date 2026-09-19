@@ -1,7 +1,13 @@
-# Environnement Tabibi complet (dev). docker compose up -d
+# Environnement Tabibi complet pour le developpement : PostgreSQL 16 + Keycloak 26 (realm tabibi importe avec
+# les comptes de demonstration). Identique au docker-compose.yml de tabibi-backend : lancer l'un ou l'autre.
+#   docker compose up -d
+# Ensuite : mvn spring-boot:run (tabibi-backend, ajouter -Dspring-boot.run.profiles=postgres pour la base),
+#           npm start (tabibi-web), flutter run (tabibi-mobile).
+# Keycloak : http://localhost:8081 (admin / admin). PostgreSQL : localhost:5432 (tabibi / tabibi).
 services:
   postgres:
     image: postgres:16
+    container_name: tabibi-postgres
     environment:
       POSTGRES_DB: tabibi
       POSTGRES_USER: tabibi
@@ -11,12 +17,31 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
+    container_name: tabibi-keycloak
     command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
     ports: ["8081:8080"]
+    # Copie du realm de tabibi-backend (infra/keycloak/tabibi-realm.json) : importee au premier demarrage seulement.
     volumes: ["./infra/keycloak:/opt/keycloak/data/import:ro"]
+
+  # Optionnel : l'API en conteneur, comme en production (en dev on prefere mvn spring-boot:run).
+  # Construire d'abord l'image dans tabibi-backend : docker build -t tabibi-backend .
+  # Les jetons portent l'emetteur vu par le navigateur (localhost:8081) ; les cles sont lues en interne.
+  # backend:
+  #   image: tabibi-backend
+  #   container_name: tabibi-backend
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: postgres
+  #     SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tabibi
+  #     SPRING_DATASOURCE_USERNAME: tabibi
+  #     SPRING_DATASOURCE_PASSWORD: tabibi
+  #     TABIBI_KEYCLOAK_ISSUER: http://localhost:8081/realms/tabibi
+  #     SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/tabibi/protocol/openid-connect/certs
+  #     SERVER_FORWARD_HEADERS_STRATEGY: none
+  #   ports: ["8080:8080"]
+  #   depends_on: [postgres, keycloak]
 
 volumes:
   tabibi-pg:
