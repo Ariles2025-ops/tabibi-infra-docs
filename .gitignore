@@ -1,1 +1,5 @@
 .DS_Store
+
+# Resultat du scenario d'integration (integration/scenario-api.mjs) : identifiants et code de verification d'une
+# ordonnance reellement emise par la pile du moment. Donnees vivantes, effacees avec la pile : jamais commitees.
+/integration/resultat-scenario.json

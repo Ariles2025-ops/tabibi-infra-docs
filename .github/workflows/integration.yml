@@ -96,6 +96,9 @@ jobs:
         working-directory: tabibi-infra-docs/integration/web
         run: npx playwright install --with-deps chromium
 
+      # CODE_ORDONNANCE n'est pas passe ici : lancer.sh a laisse le code de l'ordonnance reellement emise dans
+      # integration/resultat-scenario.json (la pile est conservee, GARDER_LA_PILE=1 ci-dessus), et verifier-web.sh
+      # l'y lit tout seul avant d'appeler Playwright.
       - name: Front web dans un vrai navigateur (verifier-web.sh, Playwright)
         working-directory: tabibi-infra-docs/integration
         env:

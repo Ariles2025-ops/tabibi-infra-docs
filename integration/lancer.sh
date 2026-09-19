@@ -8,8 +8,16 @@
 #                                            # ou pour l'explorer) ; l'arreter avec :
 #   docker compose -f integration/docker-compose.integration.yml down -v
 #
+# Le scenario ecrit aussi son resultat (identifiant du medecin publie, du rendez-vous, et surtout le code de
+# verification de l'ordonnance emise) dans un petit fichier JSON : integration/resultat-scenario.json par defaut,
+# chemin surchargeable par FICHIER_RESULTAT. integration/verifier-web.sh le lit et en tire CODE_ORDONNANCE, ce qui
+# permet aux tests navigateur de verifier le cas « code de verification valide » avec une vraie ordonnance. Le
+# fichier decrit des donnees vivantes : il est efface en meme temps que la pile (sauf avec GARDER_LA_PILE=1, ou son
+# chemin est affiche a la fin).
+#
 # Variables : TABIBI_BACKEND_DIR (sources de tabibi-backend ; defaut : ../../tabibi-backend a cote de ce depot),
-#             TABIBI_ATTENTE_S (attente maximale du demarrage, 240 s).
+#             TABIBI_ATTENTE_S (attente maximale du demarrage, 240 s),
+#             FICHIER_RESULTAT (resultat du scenario ; defaut : integration/resultat-scenario.json).
 set -euo pipefail
 
 ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,6 +26,8 @@ export TABIBI_BACKEND_DIR="${TABIBI_BACKEND_DIR:-$ICI/../../tabibi-backend}"
 ATTENTE_S="${TABIBI_ATTENTE_S:-240}"
 API="${TABIBI_API_URL:-http://localhost:8080}"
 ISSUER="${TABIBI_KEYCLOAK_ISSUER:-http://localhost:8081/realms/tabibi}"
+# Expose le fichier de resultat : le scenario l'ecrit, verifier-web.sh (meme defaut) l'y retrouve sans rien recevoir.
+export FICHIER_RESULTAT="${FICHIER_RESULTAT:-$ICI/resultat-scenario.json}"
 
 journal() { printf '\n== %s\n' "$*"; }
 
@@ -56,9 +66,15 @@ terminer() {
   fi
   if [ "${GARDER_LA_PILE:-0}" = "1" ]; then
     journal "Pile conservee (GARDER_LA_PILE=1) : docker compose -f $ICI/docker-compose.integration.yml down -v pour l'arreter"
+    if [ -f "$FICHIER_RESULTAT" ]; then
+      echo "Resultat du scenario : $FICHIER_RESULTAT"
+      echo "  (code de l'ordonnance emise ; integration/verifier-web.sh le lit et exporte CODE_ORDONNANCE)"
+    fi
   else
     journal "Arret de la pile et suppression des volumes"
     "${COMPOSE[@]}" down -v --remove-orphans || true
+    # Les donnees decrites par le resultat viennent de partir avec les volumes : ne pas laisser un fichier trompeur.
+    rm -f "$FICHIER_RESULTAT"
   fi
   exit "$CODE"
 }
@@ -73,5 +89,7 @@ attendre "$API/actuator/health" "API" || { CODE=1; exit; }
 "${COMPOSE[@]}" ps
 
 journal "Scenario API"
+# Un resultat d'une execution precedente ne doit jamais etre pris pour celui-ci.
+rm -f "$FICHIER_RESULTAT"
 TABIBI_API_URL="$API" TABIBI_KEYCLOAK_ISSUER="$ISSUER" TABIBI_ATTENTE_S="$ATTENTE_S" \
   node "$ICI/scenario-api.mjs" || CODE=$?

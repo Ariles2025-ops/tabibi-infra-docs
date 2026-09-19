@@ -12,16 +12,28 @@
  *
  * Node 20 ou plus, aucune dependance (fetch natif). Chaque etape affiche OK ou ECHEC ; le script s'arrete au premier
  * echec avec le code de sortie 1. Variables : TABIBI_API_URL (http://localhost:8080), TABIBI_KEYCLOAK_ISSUER
- * (http://localhost:8081/realms/tabibi), TABIBI_ATTENTE_S (delai maximal d'attente du demarrage, 240 s).
+ * (http://localhost:8081/realms/tabibi), TABIBI_ATTENTE_S (delai maximal d'attente du demarrage, 240 s),
+ * FICHIER_RESULTAT (integration/resultat-scenario.json).
+ *
+ * En plus de l'affichage, le scenario ecrit son resultat dans FICHIER_RESULTAT : un petit objet JSON
+ * { medecinId, rendezVousId, ordonnanceId, codeOrdonnance, genereLe }. C'est par lui que le code de verification
+ * d'une VRAIE ordonnance parvient aux tests navigateur : integration/verifier-web.sh le lit et exporte
+ * CODE_ORDONNANCE, sans quoi le cas « code de verification valide » de integration/web est saute. Le fichier decrit
+ * des donnees vivantes (elles disparaissent avec la pile) : il n'est jamais commite (.gitignore).
  *
  *   node integration/scenario-api.mjs
  */
+
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const API = sansBarreFinale(process.env.TABIBI_API_URL || 'http://localhost:8080');
 const ISSUER = sansBarreFinale(process.env.TABIBI_KEYCLOAK_ISSUER || 'http://localhost:8081/realms/tabibi');
 const URL_JETON = `${ISSUER}/protocol/openid-connect/token`;
 const CLIENT_ID = 'tabibi-web';
 const ATTENTE_MAX_MS = Number(process.env.TABIBI_ATTENTE_S || 240) * 1000;
+/** Ou deposer le resultat lu ensuite par les tests navigateur ; par defaut a cote de ce script. */
+const FICHIER_RESULTAT = process.env.FICHIER_RESULTAT || fileURLToPath(new URL('resultat-scenario.json', import.meta.url));
 
 /** Comptes de demonstration du realm de tabibi-backend (identifiants fixes : sujet du jeton = identifiant metier). */
 const COMPTES = {
@@ -342,6 +354,18 @@ await etape('Le medecin redige une ordonnance (POST /api/ordonnances, 201)', asy
   return `ordonnance ${ordonnance.id}, code ${ordonnance.codeVerification}`;
 });
 
+await etape('Le resultat du scenario est ecrit pour les tests navigateur (medecin, rendez-vous, code de l\'ordonnance)', () => {
+  const resultat = {
+    medecinId: COMPTES.medecin.id,
+    rendezVousId: etat.rendezVous.id,
+    ordonnanceId: etat.ordonnance.id,
+    codeOrdonnance: etat.ordonnance.codeVerification,
+    genereLe: new Date().toISOString(),
+  };
+  writeFileSync(FICHIER_RESULTAT, `${JSON.stringify(resultat, null, 2)}\n`, 'utf8');
+  return `${FICHIER_RESULTAT} (code ${resultat.codeOrdonnance})`;
+});
+
 await etape('La verification publique de l\'ordonnance repond 200 (GET /api/ordonnances/verifier/{code}, sans jeton)', async () => {
   const resultat = await appelAttendu('GET', `/api/ordonnances/verifier/${encodeURIComponent(etat.ordonnance.codeVerification)}`, 200);
   verifier(resultat.valide === true, `valide ${resultat.valide}`);
@@ -382,3 +406,4 @@ await etape('Un acces hors role est refuse : patient sur /api/admin/statistiques
 });
 
 console.log(`\nScenario termine : ${numero} etapes OK (API ${API}, Keycloak ${ISSUER}).`);
+console.log(`Resultat (code de l'ordonnance pour les tests navigateur) : ${FICHIER_RESULTAT}`);
