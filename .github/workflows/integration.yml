@@ -1,7 +1,7 @@
 # Integration reelle des trois briques : l'API de tabibi-backend construite depuis ses sources, PostgreSQL 16,
 # Keycloak 26 (realm et comptes de demonstration), puis le front web de tabibi-web (image node, rendu cote serveur)
 # face a cette API. Aucun simulateur : integration/lancer.sh joue le scenario API (integration/scenario-api.mjs),
-# integration/verifier-web.sh controle les pages rendues cote serveur.
+# integration/verifier-web.sh ouvre le front dans un vrai navigateur avec Playwright (integration/web).
 #
 # Les depots de code sont clones a cote de celui-ci ; l'organisation vient de la variable de depot ORG_GITHUB
 # (Settings > Secrets and variables > Actions > Variables), sinon du proprietaire de ce depot. Si les depots de code
@@ -54,6 +54,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: tabibi-infra-docs/integration/web/package-lock.json
 
       - name: Versions verifiees
         run: |
@@ -84,13 +86,36 @@ jobs:
             -e TABIBI_KEYCLOAK_ISSUER=http://localhost:8081/realms/tabibi \
             tabibi-web:integration
 
-      - name: Pages rendues cote serveur (verifier-web.sh)
+      # Un seul outil de test navigateur dans tout le projet : Playwright. Les dependances et le navigateur sont
+      # installes ici (cache npm de setup-node ci-dessus) ; verifier-web.sh les trouve alors deja en place.
+      - name: Dependances des tests navigateur (integration/web)
+        working-directory: tabibi-infra-docs/integration/web
+        run: npm ci --no-audit --no-fund
+
+      - name: Navigateur Chromium de Playwright
+        working-directory: tabibi-infra-docs/integration/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Front web dans un vrai navigateur (verifier-web.sh, Playwright)
         working-directory: tabibi-infra-docs/integration
         env:
-          TABIBI_WEB_URL: http://localhost:4200
-          TABIBI_API_URL: http://localhost:8080
-          TABIBI_KEYCLOAK_ISSUER: http://localhost:8081/realms/tabibi
+          URL_WEB: http://localhost:4200
+          URL_API: http://localhost:8080
+          ISSUER_KEYCLOAK: http://localhost:8081/realms/tabibi
         run: ./verifier-web.sh
+
+      # Rapport HTML, traces, captures et videos : toujours publies, verts comme rouges (une trace d'un test vert
+      # sert aussi a comprendre une regression du lendemain).
+      - name: Rapport Playwright et captures en artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-integration-web
+          path: |
+            tabibi-infra-docs/integration/web/playwright-report
+            tabibi-infra-docs/integration/web/test-results
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Journaux des conteneurs
         if: failure()
