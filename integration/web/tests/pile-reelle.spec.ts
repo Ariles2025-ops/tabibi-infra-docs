@@ -47,7 +47,7 @@ test.describe('Front web face a la pile reelle', () => {
 
     // 2. Dans le navigateur, une fois l'application hydratee : la meme liste reste affichee.
     await ouvrir(page, '/');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Trouver un praticien');
+    await expect(page.getByRole('heading', { name: 'Trouver un praticien', exact: true })).toBeVisible();
     for (const medecin of annuaire) {
       await expect(page.getByRole('link', { name: new RegExp(echapper(medecin.nomComplet)) })).toBeVisible();
     }
@@ -198,7 +198,7 @@ test.describe('Front web face a la pile reelle', () => {
 
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('البحث عن طبيب');
+    await expect(page.getByRole('heading', { name: 'البحث عن طبيب', exact: true })).toBeVisible();
     // Les donnees de l'API ne sont pas traduites : les praticiens reels restent affiches.
     const [premier] = await praticiens();
     if (premier) {
