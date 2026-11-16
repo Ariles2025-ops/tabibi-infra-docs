@@ -216,8 +216,9 @@ await etape('Sans jeton, /api/moi refuse (401)', async () => {
 });
 
 await etape('Le medecin ouvre un creneau (POST /api/medecin/creneaux, 201) sans etre encore dans l\'annuaire', async () => {
-  const debut = new Date(Date.now() + 2 * 24 * 3600 * 1000);
-  debut.setUTCMinutes(0, 0, 0);
+  // Creneau tres proche (minute pleine, au moins 90 s plus tard) : l'API refuse d'honorer un rendez-vous
+  // qui n'a pas encore eu lieu, l'etape « honorer » attend donc que son debut soit passe.
+  const debut = new Date(Math.ceil((Date.now() + 90 * 1000) / 60000) * 60000);
   const creneau = await appelAttendu('POST', '/api/medecin/creneaux', 201, {
     jeton: jetons.medecin,
     corps: { debut: debut.toISOString(), dureeMinutes: 30 },
@@ -313,6 +314,8 @@ await etape('Le patient et le medecin ont recu une notification (GET /api/notifi
 });
 
 await etape('Le medecin honore le rendez-vous (POST /api/rendezvous/{id}/honorer)', async () => {
+  const attente = new Date(etat.creneau.debut).getTime() + 2000 - Date.now();
+  if (attente > 0) await new Promise((r) => setTimeout(r, attente));
   const honore = await appelAttendu('POST', `/api/rendezvous/${etat.rendezVous.id}/honorer`, 200, { jeton: jetons.medecin });
   verifier(honore.statut === 'HONORE', `statut ${honore.statut}`);
   const agenda = await appelAttendu('GET', '/api/medecin/rendezvous', 200, { jeton: jetons.medecin });
