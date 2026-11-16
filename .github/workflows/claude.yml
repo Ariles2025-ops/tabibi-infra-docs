@@ -33,3 +33,4 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: --max-turns 60 --allowedTools "Bash(gh pr create:*),Bash(gh pr list:*),Bash(gh issue comment:*),Bash(git:*),Bash(npm ci),Bash(npm run *),Bash(npx ng *),Bash(./mvnw *),Bash(mvn *),Bash(flutter *),Bash(dart *),Bash(node *),Read,Edit,Write,Glob,Grep" --append-system-prompt "Quand ton travail est fini et poussé sur ta branche claude/..., ouvre TOI-MÊME la pull request vers main avec gh pr create (titre et description en français, avec Closes #<numéro du ticket>). Ne te contente pas d'un lien Create PR. Ne pousse jamais sur main."
