@@ -1,0 +1,21 @@
+# Agent sécurité du site en ligne : analyse passive OWASP ZAP de tabibi.doctor chaque lundi.
+# Passive = lit les réponses (en-têtes, cookies, fuites), n'attaque rien et ne charge pas le serveur.
+name: Securite du site en ligne
+on:
+  schedule:
+    - cron: '30 5 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Analyse passive ZAP (accueil + pages publiques)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: 'https://tabibi.doctor'
+          allow_issue_writing: false
+          fail_action: false
+          cmd_options: '-m 5'
