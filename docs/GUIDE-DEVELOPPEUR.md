@@ -258,7 +258,7 @@ migrée par Liquibase, accepte les jetons du vrai Keycloak et enchaîne les cas 
 | `integration/scenario-api.mjs` | scénario Node 20 sans dépendance (`fetch` natif) : attend `/actuator/health` et le realm, obtient les jetons par mot de passe (`grant_type=password`, client `tabibi-web`) de `medecin.demo`, `patient.demo`, `admin.demo`, puis déroule 21 étapes ; chaque étape affiche `OK` ou `ECHEC` et le script sort en erreur (code 1) au premier échec ; une étape dépose le résultat (médecin publié, rendez-vous, code de l'ordonnance) dans `FICHIER_RESULTAT`, sitôt l'ordonnance émise |
 | `integration/lancer.sh` | `docker compose up -d --build`, attente de Keycloak et de l'API, scénario, journaux des conteneurs en cas d'échec, `down -v` ; expose `FICHIER_RESULTAT` (défaut `integration/resultat-scenario.json`), affiche son chemin avec `GARDER_LA_PILE=1` et l'efface quand la pile est détruite |
 | `integration/verifier-web.sh` | lanceur mince des tests navigateur : lecture du résultat du scénario (`CODE_ORDONNANCE`), dépendances (`npm ci`), Chromium de Playwright si besoin, puis `npx playwright test` |
-| `integration/web/` | les tests eux-mêmes : `package.json` (`@playwright/test` seul), `playwright.config.ts` (projet `chromium`, `baseURL` = `URL_WEB`, trace / capture / vidéo conservées en cas d'échec, **pas de `webServer`** : la pile est déjà lancée), `tests/outils.ts` (`ouvrir()` qui attend l'hydratation, `lireApi()` / `praticiens()` qui interrogent l'API réelle, `htmlRendu()` qui relit le HTML sans navigateur), `tests/pile-reelle.spec.ts` (10 tests) |
+| `integration/web/` | les tests eux-mêmes : `package.json` (`@playwright/test` seul), `playwright.config.ts` (projet `chromium`, `baseURL` = `URL_WEB`, trace / capture / vidéo conservées en cas d'échec, **pas de `webServer`** : la pile est déjà lancée), `tests/outils.ts` (`ouvrir()` qui attend l'hydratation, `lireApi()` / `praticiens()` qui interrogent l'API réelle, `htmlRendu()` qui relit le HTML sans navigateur), `tests/pile-reelle.spec.ts` (10 tests), `tests/espaces-connectes.spec.ts` (4 tests : espaces médecin, secrétaire et pharmacie, connexion réelle à Keycloak ; `seConnecter()` active l'accès équipe `tabibi.equipe` du front dans le seul navigateur de test, la valeur de production `PRELANCEMENT` n'est jamais modifiée) |
 | `.github/workflows/integration.yml` | la CI qui enchaîne tout (voir plus bas) |
 
 **Le parcours vérifié** (dans l'ordre) : jetons et émetteur ; `GET /api/moi` (sujet et rôle de chaque compte) ; 401
@@ -312,7 +312,7 @@ GARDER_LA_PILE=1 integration/lancer.sh
 docker build -t tabibi-web:integration ../tabibi-web
 docker run -d --name tabibi-web-integration --network host -e PORT=4200 \
   -e TABIBI_API_URL=http://localhost:8080 -e TABIBI_KEYCLOAK_ISSUER=http://localhost:8081/realms/tabibi tabibi-web:integration
-integration/verifier-web.sh                 # dépendances + Chromium si besoin, puis les 10 tests Playwright
+integration/verifier-web.sh                 # dépendances + Chromium si besoin, puis les 14 tests Playwright
 docker rm -f tabibi-web-integration && docker compose -f integration/docker-compose.integration.yml down -v
 ```
 
