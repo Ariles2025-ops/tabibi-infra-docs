@@ -26,45 +26,40 @@ test.describe('Front web face a la pile reelle', () => {
     expect(config.keycloakClientId).toBe('tabibi-web');
   });
 
-  test("l'accueil rendu cote serveur affiche « Trouver un praticien » et chaque praticien de l'API", async ({ page, request }) => {
+  test("l'accueil est rendu cote serveur, et la page de sa specialite liste chaque praticien de l'API", async ({ request }) => {
     const annuaire = await praticiens();
     expect(
       annuaire.length,
       "l'annuaire de l'API reelle est vide : rien a comparer (integration/scenario-api.mjs a-t-il tourne ?)",
     ).toBeGreaterThan(0);
 
-    // 1. Sans navigateur : la preuve du rendu cote serveur (le serveur de rendu a bien appele GET /api/medecins).
-    const html = await htmlRendu(request, '/', 'Trouver un praticien');
-    expect(html, 'la page / rendue cote serveur ne contient pas « Trouver un praticien » (page sans rendu ?)').toContain(
-      'Trouver un praticien',
+    // L'accueil (pre-lancement) : le rendu cote serveur a bien eu lieu.
+    const accueil = await htmlRendu(request, '/', 'Votre santé ne devrait jamais attendre');
+    expect(accueil, "la page / rendue cote serveur n'affiche pas son titre (page sans rendu ?)").toContain(
+      'Votre santé ne devrait jamais attendre',
     );
+
+    // Les pages de referencement par specialite listent, rendus cote serveur, les praticiens renvoyes par l'API.
     for (const medecin of annuaire) {
-      expect(html, `la page / rendue cote serveur ne contient pas « ${medecin.nomComplet} », renvoye par l'API`).toContain(
+      const chemin = `/specialites/${medecin.specialiteSlug}`;
+      const html = await htmlRendu(request, chemin, medecin.nomComplet);
+      expect(html, `${chemin} rendue cote serveur ne contient pas « ${medecin.nomComplet} », renvoye par l'API`).toContain(
         medecin.nomComplet,
       );
-      expect(html).toContain(`href="/medecins/${medecin.id}"`);
-    }
-
-    // 2. Dans le navigateur, une fois l'application hydratee : la meme liste reste affichee.
-    await ouvrir(page, '/');
-    await expect(page.getByRole('heading', { name: 'Trouver un praticien', exact: true })).toBeVisible();
-    for (const medecin of annuaire) {
-      await expect(page.getByRole('link', { name: new RegExp(echapper(medecin.nomComplet)) })).toBeVisible();
+      expect(html).toContain(`href="/praticiens/${medecin.id}/`);
     }
   });
 
-  test('la fiche du premier praticien affiche son nom et sa specialite lus dans l\'API', async ({ page }) => {
+  test('la fiche publique du premier praticien affiche son nom lu dans l\'API', async ({ page }) => {
     const [premier] = await praticiens();
     expect(premier, "l'annuaire de l'API reelle est vide : aucune fiche a ouvrir").toBeTruthy();
 
     // La fiche est relue une a une : c'est bien GET /api/medecins/{id} que le serveur de rendu appelle.
-    const fiche = await lireApi<{ nomComplet: string; specialiteFr: string; ville: string; wilayaFr: string }>(
-      `/api/medecins/${premier.id}`,
-    );
+    const fiche = await lireApi<{ nomComplet: string }>(`/api/medecins/${premier.id}`);
 
-    await ouvrir(page, `/medecins/${premier.id}`);
+    await ouvrir(page, `/praticiens/${premier.id}/fiche`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(fiche.nomComplet);
-    await expect(page.getByText(`${fiche.specialiteFr} · ${fiche.ville} (${fiche.wilayaFr})`)).toBeVisible();
+    await expect(page).toHaveTitle(new RegExp(echapper(fiche.nomComplet)));
   });
 
   test('la recherche par specialite filtre reellement la liste', async ({ page }) => {
@@ -130,30 +125,15 @@ test.describe('Front web face a la pile reelle', () => {
     await expect(page.getByText('Code inconnu.')).toHaveCount(0);
   });
 
-  test('une page privee renvoie le visiteur vers le Keycloak reel', async ({ page, request }) => {
-    // Rendue par le serveur : la page privee est noindex et annonce la redirection, sans reveler de donnee.
-    const html = await (await request.get('/mes-rendez-vous')).text();
-    expect(html).toContain('<meta name="robots" content="noindex, nofollow">');
-    expect(html).toContain('Redirection vers la page de connexion');
-
-    // Dans le navigateur : pas d'attente de l'hydratation, la page part des que l'etat de connexion est connu.
-    await page.goto('/mes-rendez-vous');
-    let surKeycloak = true;
-    try {
-      await page.waitForURL((url) => url.href.includes('/realms/tabibi') && url.href.includes('/auth'), { timeout: 20_000 });
-    } catch {
-      surKeycloak = false;
-    }
-
-    if (surKeycloak) {
-      const url = new URL(page.url());
-      expect(url.origin, "la redirection ne vise pas l'emetteur Keycloak de la pile").toBe(new URL(ISSUER_KEYCLOAK).origin);
-      expect(url.searchParams.get('client_id')).toBe('tabibi-web');
-      expect(url.searchParams.get('response_type')).toBe('code');
-    } else {
-      // Redirection non aboutie (Keycloak lent a repondre) : la page l'annonce au moins a l'ecran.
-      await expect(page.getByText('Redirection vers la page de connexion')).toBeVisible();
-    }
+  test('en pre-lancement, une page privee mene le visiteur a la page « Lancement prochainement »', async ({ page }) => {
+    // tabibi-web (lancement.ts, PRELANCEMENT) : connexion et inscription fermees au public jusqu'au lancement.
+    // La fiche privee /medecins/{id} est gardee (connecteGuard) : le visiteur non connecte part vers la connexion,
+    // qui mene a /bientot tant que le site n'est pas lance.
+    const [premier] = await praticiens();
+    expect(premier, "l'annuaire de l'API reelle est vide : aucune fiche privee a ouvrir").toBeTruthy();
+    await page.goto(`/medecins/${premier.id}`);
+    await page.waitForURL((url) => url.pathname === '/bientot', { timeout: 20_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Lancement prochainement' })).toBeVisible();
   });
 
   test("robots.txt et sitemap.xml repondent, et le plan du site liste le premier praticien de l'API", async ({ request }) => {
@@ -165,16 +145,22 @@ test.describe('Front web face a la pile reelle', () => {
     expect(robots.headers()['content-type']).toContain('text/plain');
     const texte = await robots.text();
     expect(texte).toContain('User-agent: *');
-    expect(texte).toContain('Disallow: /mes-');
+    expect(texte).toContain('Disallow: /moi');
     expect(texte).toContain('/sitemap.xml');
 
-    const sitemap = await request.get('/sitemap.xml');
-    expect(sitemap.status()).toBe(200);
-    expect(sitemap.headers()['content-type']).toContain('application/xml');
-    const xml = await sitemap.text();
-    expect(xml).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
-    expect(xml, `le plan du site n'annonce pas la fiche /medecins/${premier.id} de l'API`).toContain(
-      `/medecins/${premier.id}</loc>`,
+    // Index des plans (server.ts) : pages fixes FR/AR et une page par lot de 5 000 praticiens, tirees de l'API.
+    const index = await request.get('/sitemap.xml');
+    expect(index.status()).toBe(200);
+    expect(index.headers()['content-type']).toContain('application/xml');
+    const xmlIndex = await index.text();
+    expect(xmlIndex).toContain('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+    expect(xmlIndex).toContain('sitemap-praticiens-0.xml');
+
+    const plan = await request.get('/sitemap-praticiens-0.xml');
+    expect(plan.status()).toBe(200);
+    const xml = await plan.text();
+    expect(xml, `le plan du site n'annonce pas la fiche /praticiens/${premier.id} de l'API`).toContain(
+      `/praticiens/${premier.id}/`,
     );
     expect(xml).not.toContain('/mes-rendez-vous');
   });
@@ -189,22 +175,16 @@ test.describe('Front web face a la pile reelle', () => {
     expect(csp).toContain("frame-ancestors 'none'");
   });
 
-  test('le selecteur de langue bascule la page en arabe (dir rtl, titre arabe)', async ({ page }) => {
+  test("le lien « العربية » mene a l'accueil arabe (lang ar, sens rtl, titre arabe)", async ({ page }) => {
     await ouvrir(page, '/');
-    await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+    await page.locator('a[href="/ar"][lang="ar"]').first().click();
 
-    // Le selecteur de la barre de navigation (tabibi-web >= v0.23.0) : un bouton par langue, marque par `lang`.
-    await page.locator('.selecteur-langue button[lang="ar"]').click();
-
-    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await page.waitForURL((url) => url.pathname === '/ar');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
-    await expect(page.getByRole('heading', { name: 'البحث عن طبيب', exact: true })).toBeVisible();
-    // Les donnees de l'API ne sont pas traduites : les praticiens reels restent affiches.
-    const [premier] = await praticiens();
-    if (premier) {
-      await expect(page.getByRole('link', { name: new RegExp(echapper(premier.nomComplet)) })).toBeVisible();
-    }
+    await expect(page.locator('main[dir="rtl"]')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'احجز موعدك مع طبيب في الجزائر' })).toBeVisible();
   });
+
 });
 
 /** Echappe les caracteres speciaux d'une donnee de l'API avant de la mettre dans une expression reguliere. */
