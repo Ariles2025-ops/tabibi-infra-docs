@@ -179,6 +179,12 @@ const etat = {};
 
 console.log(`Scenario d'integration Tabibi : API ${API}, Keycloak ${ISSUER}`);
 
+/** Compare deux libelles sans tenir compte des accents ni de la casse (le serveur ecrit en francais accentue). */
+function memeTexte(a, b) {
+  const n = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  return n(a) === n(b);
+}
+
 await etape("L'API repond sur /actuator/health", () => attendre(`${API}/actuator/health`, 200));
 
 await etape('Le realm tabibi est importe dans Keycloak', () => attendre(`${ISSUER}`, 200));
@@ -259,7 +265,7 @@ await etape("Le medecin est publie dans l'annuaire (fiche existante, ou candidat
   etat.medecin = publiee;
 
   const notifications = await appelAttendu('GET', '/api/notifications/mes', 200, { jeton: jetons.medecin });
-  verifier(notifications.some((n) => n.sujet === 'Candidature validee'), 'le medecin devrait etre notifie de la validation');
+  verifier(notifications.some((n) => memeTexte(n.sujet, 'Candidature validée')), 'le medecin devrait etre notifie de la validation');
   return `candidature ${candidatureId} validee, fiche ${publiee.nomComplet} publiee, medecin notifie`;
 });
 
@@ -299,10 +305,10 @@ await etape('Le patient retrouve son rendez-vous (GET /api/rendezvous/mes)', asy
 await etape('Le patient et le medecin ont recu une notification (GET /api/notifications/mes non vide)', async () => {
   const patient = await appelAttendu('GET', '/api/notifications/mes', 200, { jeton: jetons.patient });
   verifier(Array.isArray(patient) && patient.length > 0, 'aucune notification pour le patient');
-  verifier(patient.some((n) => n.sujet === 'Rendez-vous confirme'), `sujets : ${patient.map((n) => n.sujet).join(' | ')}`);
+  verifier(patient.some((n) => memeTexte(n.sujet, 'Rendez-vous confirmé')), `sujets : ${patient.map((n) => n.sujet).join(' | ')}`);
   verifier(patient.every((n) => n.destinataireId === COMPTES.patient.id), "une notification d'un autre destinataire est visible");
   const medecin = await appelAttendu('GET', '/api/notifications/mes', 200, { jeton: jetons.medecin });
-  verifier(medecin.some((n) => n.sujet === 'Nouveau rendez-vous'), `sujets medecin : ${medecin.map((n) => n.sujet).join(' | ')}`);
+  verifier(medecin.some((n) => memeTexte(n.sujet, 'Nouveau rendez-vous')), `sujets medecin : ${medecin.map((n) => n.sujet).join(' | ')}`);
   return `patient : ${patient.length}, medecin : ${medecin.length}`;
 });
 
