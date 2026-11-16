@@ -42,6 +42,7 @@ jobs:
           claude_args: --max-turns 40 --allowedTools "Bash(gh run view:*),Bash(gh run rerun:*),Bash(gh run list:*),Bash(gh pr create:*),Bash(git:*),Bash(npm ci),Bash(npm run *),Bash(npx ng *),Bash(./mvnw *),Bash(mvn *),Bash(flutter *),Bash(dart *),Read,Edit,Write,Glob,Grep"
       - name: Ticket si Claude n'a pas pu réparer
         if: failure()
-        run: gh issue create -R "${{ github.repository }}" -t "Réparation auto impossible : ${{ github.event.workflow_run.name }}" -b "L'agent réparateur n'a pas pu corriger l'échec : ${{ github.event.workflow_run.html_url }}"
+        run: |
+          gh issue create -R "${{ github.repository }}" -t "Réparation auto impossible : ${{ github.event.workflow_run.name }}" -b "L'agent réparateur n'a pas pu corriger l'échec : ${{ github.event.workflow_run.html_url }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
