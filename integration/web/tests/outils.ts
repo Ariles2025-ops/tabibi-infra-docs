@@ -1,5 +1,7 @@
-import { APIRequestContext, Page, Response } from '@playwright/test';
-import { URL_API } from '../playwright.config';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { APIRequestContext, Page, Response, expect } from '@playwright/test';
+import { URL_API, URL_WEB } from '../playwright.config';
 
 /** Fiche publique d'un praticien, telle que la renvoie GET /api/medecins de l'API reelle. */
 export interface Medecin {
@@ -72,4 +74,60 @@ export async function htmlRendu(
 
 function resume(texte: string): string {
   return texte && texte.length > 300 ? `${texte.slice(0, 300)}...` : texte;
+}
+
+/** Resultat ecrit par integration/scenario-api.mjs (voir son en-tete) : identifiants et donnees vivantes de la pile. */
+export interface ResultatScenario {
+  medecinId: string;
+  rendezVousId: string;
+  ordonnanceId: string;
+  codeOrdonnance: string;
+  secretaireRattachee?: boolean;
+  besoinId?: string;
+  besoinMedicament?: string;
+  besoinWilayaCode?: string;
+}
+
+/** Lit FICHIER_RESULTAT (defaut integration/resultat-scenario.json) ; null si le scenario n'a pas ete joue. */
+export function lireResultatScenario(): ResultatScenario | null {
+  const chemin = process.env['FICHIER_RESULTAT'] || resolve(__dirname, '../../resultat-scenario.json');
+  try {
+    return JSON.parse(readFileSync(chemin, 'utf8')) as ResultatScenario;
+  } catch {
+    return null;
+  }
+}
+
+/** Comptes de demonstration du realm tabibi (les memes que scenario-api.mjs). */
+export const COMPTES = {
+  medecin: { utilisateur: 'medecin.demo', motDePasse: 'medecin' },
+  secretaire: { utilisateur: 'secretaire.demo', motDePasse: 'secretaire' },
+  pharmacie: { utilisateur: 'pharmacie.demo', motDePasse: 'pharmacie' },
+};
+
+/**
+ * Se connecte pour de vrai : ouvre `chemin` (page gardee) ; le front envoie vers le formulaire Keycloak du realm
+ * tabibi, on y saisit le compte, puis Keycloak ramene sur `chemin`.
+ *
+ * Pre-lancement : en production la connexion mene a /bientot (PRELANCEMENT dans src/app/lancement.ts de tabibi-web).
+ * On n'y touche pas : on utilise l'acces equipe prevu par ce meme fichier (cle localStorage « tabibi.equipe » a 1,
+ * l'equivalent de https://.../?equipe=1) UNIQUEMENT dans le navigateur de test, donc seulement dans la pile
+ * d'integration ; l'image du web et la valeur de production restent inchangees.
+ */
+export async function seConnecter(page: Page, compte: { utilisateur: string; motDePasse: string }, chemin: string): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('tabibi.equipe', '1');
+    } catch {
+      // origine sans stockage : sans importance
+    }
+  });
+  await page.goto(chemin);
+  await page.locator('input[name="username"]').fill(compte.utilisateur, { timeout: 30_000 });
+  await page.locator('input[name="password"]').fill(compte.motDePasse);
+  await page.locator('input[name="password"]').press('Enter');
+  const origineWeb = new URL(URL_WEB).origin;
+  await page.waitForURL((url) => url.origin === origineWeb && url.pathname.startsWith(chemin), { timeout: 30_000 });
+  await page.locator('app-root:not([ngh])').waitFor();
+  expect(new URL(page.url()).pathname, 'redirige vers /bientot : le pre-lancement ferme encore la connexion').not.toBe('/bientot');
 }

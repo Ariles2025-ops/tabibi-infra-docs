@@ -8,7 +8,8 @@
  *   identite (/api/moi et roles), ouverture d'un creneau par le medecin, publication du medecin dans l'annuaire
  *   (candidature + validation par l'administrateur, si l'annuaire ne le connait pas encore : en profil postgres
  *   l'annuaire demarre vide), reservation par le patient, notification, rendez-vous honore, avis verifie et synthese
- *   publique, ordonnance et verification publique par code, refus d'un acces hors role (403) et sans jeton (401).
+ *   publique, ordonnance et verification publique par code, rattachement d'une secretaire au cabinet (invitation puis acceptation), demande de medicament Dawini visible d'une
+ * pharmacie, refus d'un acces hors role (403) et sans jeton (401).
  *
  * Node 20 ou plus, aucune dependance (fetch natif). Chaque etape affiche OK ou ECHEC ; le script s'arrete au premier
  * echec avec le code de sortie 1. Variables : TABIBI_API_URL (http://localhost:8080), TABIBI_KEYCLOAK_ISSUER
@@ -16,7 +17,8 @@
  * FICHIER_RESULTAT (integration/resultat-scenario.json).
  *
  * En plus de l'affichage, le scenario ecrit son resultat dans FICHIER_RESULTAT : un petit objet JSON
- * { medecinId, rendezVousId, ordonnanceId, codeOrdonnance, genereLe }. C'est par lui que le code de verification
+ * { medecinId, rendezVousId, ordonnanceId, codeOrdonnance, secretaireRattachee, besoinId,
+ * besoinMedicament, besoinWilayaCode, genereLe }. C'est par lui que le code de verification
  * d'une VRAIE ordonnance parvient aux tests navigateur : integration/verifier-web.sh le lit et exporte
  * CODE_ORDONNANCE, sans quoi le cas « code de verification valide » de integration/web est saute. Le fichier decrit
  * des donnees vivantes (elles disparaissent avec la pile) : il n'est jamais commite (.gitignore).
@@ -40,7 +42,12 @@ const COMPTES = {
   medecin: { utilisateur: 'medecin.demo', motDePasse: 'medecin', role: 'MEDECIN', id: '00000000-0000-0000-0000-000000000001' },
   patient: { utilisateur: 'patient.demo', motDePasse: 'patient', role: 'PATIENT', id: '11111111-1111-1111-1111-111111111111' },
   admin: { utilisateur: 'admin.demo', motDePasse: 'admin', role: 'ADMIN', id: '33333333-3333-3333-3333-333333333333' },
+  pharmacie: { utilisateur: 'pharmacie.demo', motDePasse: 'pharmacie', role: 'PHARMACIE', id: '44444444-4444-4444-4444-444444444444' },
+  secretaire: { utilisateur: 'secretaire.demo', motDePasse: 'secretaire', role: 'SECRETAIRE', id: '55555555-5555-5555-5555-555555555555' },
 };
+
+/** Demande de medicament deposee par le patient (Dawini) : la pharmacie de la meme wilaya doit la voir. */
+const BESOIN_MEDICAMENT = { medicament: 'Metformine 850 mg', wilayaCode: '16', commune: 'Alger-Centre', precision: 'Boite de 60 comprimes' };
 
 /** Fiche publique deposee pour medecin.demo : la meme que le premier praticien de demonstration de l'annuaire en memoire. */
 const CANDIDATURE_MEDECIN = {
@@ -189,7 +196,7 @@ await etape("L'API repond sur /actuator/health", () => attendre(`${API}/actuator
 
 await etape('Le realm tabibi est importe dans Keycloak', () => attendre(`${ISSUER}`, 200));
 
-await etape('Jetons Keycloak (grant password, client tabibi-web) pour medecin.demo, patient.demo, admin.demo', async () => {
+await etape('Jetons Keycloak (grant password, client tabibi-web) pour les cinq comptes de demonstration (medecin, patient, admin, pharmacie, secretaire)', async () => {
   for (const [nom, compte] of Object.entries(COMPTES)) {
     jetons[nom] = await jeton(compte);
     const charge = chargeUtile(jetons[nom]);
@@ -363,12 +370,49 @@ await etape('Le medecin redige une ordonnance (POST /api/ordonnances, 201)', asy
   return `ordonnance ${ordonnance.id}, code ${ordonnance.codeVerification}`;
 });
 
+await etape("La secretaire est rattachee au cabinet : invitation du medecin puis acceptation (agenda du medecin lisible par elle)", async () => {
+  // Rattachement = invitation du medecin, puis acceptation par la secretaire (le role SECRETAIRE est deja dans le
+  // realm pour secretaire.demo). Rejouable : un 409 signifie que le rattachement existe deja.
+  const invitation = await appel('POST', '/api/medecin/secretaires', {
+    jeton: jetons.medecin,
+    corps: { secretaireId: COMPTES.secretaire.id },
+  });
+  verifier(invitation.statut === 201 || invitation.statut === 409, `rattachement : statut ${invitation.statut} (${resume(invitation.corps)})`);
+  const invitations = await appelAttendu('GET', '/api/moi/invitations-cabinet', 200, { jeton: jetons.secretaire });
+  const mienne = invitations.find((i) => i.medecinId === COMPTES.medecin.id);
+  if (mienne) {
+    const accepte = await appelAttendu('POST', `/api/moi/invitations-cabinet/${mienne.id}/accepter`, 200, { jeton: jetons.secretaire });
+    verifier(accepte.accepte === true, `invitation non acceptee : ${resume(accepte)}`);
+  }
+  const cabinets = await appelAttendu('GET', '/api/secretaire/medecins', 200, { jeton: jetons.secretaire });
+  verifier(cabinets.some((c) => c.medecinId === COMPTES.medecin.id), `cabinets de la secretaire : ${resume(cabinets)}`);
+  const agenda = await appelAttendu('GET', `/api/secretaire/medecins/${COMPTES.medecin.id}/rendezvous`, 200, { jeton: jetons.secretaire });
+  verifier(agenda.some((r) => r.id === etat.rendezVous.id), "le rendez-vous du scenario n'est pas dans l'agenda vu par la secretaire");
+  return `${cabinets.length} cabinet(s), ${agenda.length} rendez-vous dans l'agenda`;
+});
+
+await etape('Le patient publie une demande de medicament, la pharmacie la voit (Dawini)', async () => {
+  const besoin = await appelAttendu('POST', '/api/dawini/besoins', 201, { jeton: jetons.patient, corps: BESOIN_MEDICAMENT });
+  verifier(typeof besoin.id === 'string', `besoin sans identifiant : ${resume(besoin)}`);
+  const ouverts = await appelAttendu('GET', `/api/dawini/besoins?wilaya=${BESOIN_MEDICAMENT.wilayaCode}`, 200, { jeton: jetons.pharmacie });
+  verifier(ouverts.some((b) => b.id === besoin.id), `le besoin ${besoin.id} n'est pas dans les demandes ouvertes de la pharmacie`);
+  verifier(ouverts.every((b) => b.patientId === null || b.patientId === undefined), "l'identite du patient ne doit pas etre communiquee a la pharmacie");
+  etat.besoin = besoin;
+  return `besoin ${besoin.id} (${besoin.medicament}), ${ouverts.length} demande(s) ouverte(s)`;
+});
+
 await etape('Le resultat du scenario est ecrit pour les tests navigateur (medecin, rendez-vous, code de l\'ordonnance)', () => {
   const resultat = {
     medecinId: COMPTES.medecin.id,
     rendezVousId: etat.rendezVous.id,
     ordonnanceId: etat.ordonnance.id,
     codeOrdonnance: etat.ordonnance.codeVerification,
+    // Pour les espaces connectes (integration/web/tests/espaces-connectes.spec.ts) : cabinet de la secretaire et
+    // demande de medicament que la pharmacie doit voir.
+    secretaireRattachee: true,
+    besoinId: etat.besoin.id,
+    besoinMedicament: etat.besoin.medicament,
+    besoinWilayaCode: etat.besoin.wilayaCode,
     genereLe: new Date().toISOString(),
   };
   writeFileSync(FICHIER_RESULTAT, `${JSON.stringify(resultat, null, 2)}\n`, 'utf8');

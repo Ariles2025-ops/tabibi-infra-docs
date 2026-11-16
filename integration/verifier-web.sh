@@ -33,6 +33,7 @@ command -v npm >/dev/null || { echo "npm est requis." >&2; exit 2; }
 # Le code d'une vraie ordonnance, ecrit par le scenario API : sans lui, le cas « code de verification valide » de
 # integration/web/tests/pile-reelle.spec.ts est saute. Le fichier est absent quand on lance ces tests seuls.
 FICHIER_RESULTAT="${FICHIER_RESULTAT:-$ICI/resultat-scenario.json}"
+export FICHIER_RESULTAT
 if [ -z "${CODE_ORDONNANCE:-}" ] && [ -f "$FICHIER_RESULTAT" ]; then
   CODE_ORDONNANCE="$(node -e '
     const fs = require("node:fs");
