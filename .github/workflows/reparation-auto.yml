@@ -1,0 +1,47 @@
+# Agent réparateur : quand un contrôle échoue sur main, Claude lit l'erreur, corrige et ouvre une PR
+# sur une branche claude/… La PR passe les tests ; si tout est vert, elle se fusionne seule.
+# Il ne touche jamais main directement et ne déploie rien.
+name: Reparation auto
+on:
+  workflow_run:
+    workflows: [integration]
+    types: [completed]
+    branches: [main]
+concurrency:
+  group: reparation-auto
+  cancel-in-progress: false
+jobs:
+  reparer:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            Le contrôle « ${{ github.event.workflow_run.name }} » a échoué sur la branche main de ${{ github.repository }}.
+            Exécution : ${{ github.event.workflow_run.html_url }} (commit ${{ github.event.workflow_run.head_sha }}).
+            1. Lis les journaux de l'échec avec : gh run view ${{ github.event.workflow_run.id }} --log-failed
+            2. Trouve la vraie cause. Si c'est une panne passagère (réseau, service externe, délai dépassé sans erreur de code),
+               relance simplement avec : gh run rerun ${{ github.event.workflow_run.id }} --failed — et arrête-toi là.
+            3. Sinon, corrige le code ou les tests sur une nouvelle branche nommée claude/reparation-${{ github.event.workflow_run.id }},
+               puis ouvre une PR vers main qui explique en français la cause et la correction.
+            Règles : ne pousse jamais sur main, ne désactive et ne supprime aucun test pour faire passer,
+            ne touche à aucun secret, ne lance aucun déploiement.
+          claude_args: --max-turns 40 --allowedTools "Bash(gh run view:*),Bash(gh run rerun:*),Bash(gh run list:*),Bash(gh pr create:*),Bash(git:*),Bash(npm ci),Bash(npm run *),Bash(npx ng *),Bash(./mvnw *),Bash(mvn *),Bash(flutter *),Bash(dart *),Read,Edit,Write,Glob,Grep"
+      - name: Ticket si Claude n'a pas pu réparer
+        if: failure()
+        run: gh issue create -R "${{ github.repository }}" -t "Réparation auto impossible : ${{ github.event.workflow_run.name }}" -b "L'agent réparateur n'a pas pu corriger l'échec : ${{ github.event.workflow_run.html_url }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
