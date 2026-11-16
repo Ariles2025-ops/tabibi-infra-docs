@@ -23,6 +23,13 @@
 12. [Testabilité : trois niveaux de preuve](#12-testabilité--trois-niveaux-de-preuve)
 13. [Conventions](#13-conventions)
 
+> **Production aujourd'hui.** Un **serveur Oracle** unique fait tourner, sous Docker Compose, Caddy (HTTPS), le front
+> web (Angular rendu côté serveur, `tabibi.doctor`), l'API Spring Boot (`api.tabibi.doctor`), **Keycloak**
+> (`auth.tabibi.doctor`, l'identité) et PostgreSQL. Il n'y a ni Supabase ni Cloudflare Pages. La mise en ligne est
+> **automatique** (CI verte sur `main` → déploiement → porte de vérification → retour arrière automatique en cas
+> d'échec), et des agents entretiennent le code : voir [DEPLOIEMENT.md](DEPLOIEMENT.md), [agents.md](agents.md) et
+> [CLAUDE.md](../CLAUDE.md).
+
 ## 1. Principes
 
 | Principe | Ce que cela veut dire concrètement |

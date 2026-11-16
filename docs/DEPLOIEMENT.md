@@ -1,9 +1,16 @@
 # Déployer Tabibi sur un serveur
 
-> **Pourquoi ce document.** C'est le guide pas à pas pour mettre la plateforme en ligne sur un VPS unique avec
+> **Pourquoi ce document.** C'est le guide pas à pas pour mettre la plateforme en ligne sur un serveur unique (en production : Oracle) avec
 > Docker Compose, la vérifier, la sauvegarder, la mettre à jour, et savoir comment elle grandira. Les fichiers
 > d'infrastructure vivent dans le dépôt `tabibi-backend` (`docker-compose.prod.yml`, `infra/`, `.env.example`) ; ce
 > dépôt-ci porte l'environnement de développement (`docker-compose.yml`) et la copie du realm Keycloak.
+
+> **État réel de la production (à lire d'abord).** La plateforme tourne **sur un serveur Oracle** (une seule machine,
+> Docker Compose, mêmes services que ci-dessous), avec **Keycloak** pour l'identité (`auth.tabibi.doctor`), le site sur
+> `https://tabibi.doctor` et l'API sur `https://api.tabibi.doctor`. Ce n'est **ni Supabase ni Cloudflare Pages** (ces
+> options ont été étudiées puis écartées, voir [CHOIX-TECHNIQUES.md](CHOIX-TECHNIQUES.md)). **La mise en ligne est
+> automatique** : voir [section 11](#11-mettre-à-jour) et [agents.md](agents.md). Le reste de ce guide (étapes 2 à 10)
+> sert à **reconstruire** un serveur de zéro ou à en préparer un second.
 
 ## Sommaire
 
@@ -181,7 +188,31 @@ l'ouverture puis régulièrement.
 
 ## 11. Mettre à jour
 
-Une nouvelle version = une nouvelle image publiée par la CI (push sur `main` du dépôt concerné).
+**En temps normal, on ne déploie rien à la main : la mise en ligne est automatique.**
+
+1. Une PR est fusionnée sur `main` du dépôt `tabibi-backend` ou `tabibi-web` (les PR de branches `claude/…` se
+   fusionnent seules quand tout est vert).
+2. La CI de `main` doit être **verte** ; elle publie l'image `ghcr.io/<org>/<dépôt>` (`latest` et `sha-<commit>`).
+3. Le workflow **Mise en ligne** se lance seul après cette CI. Il ouvre une connexion SSH vers le serveur Oracle avec
+   une clé qui ne peut lancer **que** le déploiement (`backend <sha>` ou `web <sha>`).
+4. Le serveur n'accepte que la **tête actuelle de `main`**, fait une **copie avant** de changer quoi que ce soit,
+   déploie, puis passe la **porte de vérification** (pour le web : `scripts/verifier-en-ligne.sh` de `tabibi-web` :
+   version en ligne = commit attendu, 69 wilayas, pages de référencement rendues côté serveur en français et en arabe,
+   vraies 404, plan du site, liste complète des fiches fermée au public…).
+5. Si la porte échoue, le serveur **revient seul en arrière** ; le workflow est rouge et la version précédente reste en ligne.
+
+Rien à faire non plus pour relancer : *Actions* → **Mise en ligne** → *Run workflow*. Pour annuler un changement
+fautif : une PR qui le `git revert`, la mise en ligne repart toute seule. Les agents qui interviennent (réparation,
+chasse aux erreurs, cohérence) sont décrits dans [agents.md](agents.md).
+
+Les migrations Liquibase s'appliquent au démarrage de l'API ; une migration non rétrocompatible rend le retour arrière
+automatique insuffisant : **restaurer alors la sauvegarde** (section 10).
+
+### Mise à jour manuelle (secours, ou serveur reconstruit)
+
+À n'utiliser que si la mise en ligne automatique est indisponible. Les manipulations ci-dessous sont celles d'un
+serveur monté selon ce guide (le serveur de production en tient un équivalent, avec un fichier de surcharge Compose
+propre à lui) :
 
 ```bash
 cd /opt/tabibi/tabibi-backend
@@ -192,9 +223,7 @@ docker compose -f docker-compose.prod.yml up -d           # recrée seulement ce
 docker compose -f docker-compose.prod.yml ps
 ```
 
-Les migrations Liquibase s'appliquent au démarrage de l'API ; **faire une sauvegarde avant** toute mise à jour qui
-apporte un changelog. Retour arrière : remettre l'ancien tag et `up -d` (si la migration n'est pas rétrocompatible,
-restaurer la sauvegarde).
+Retour arrière : remettre l'ancien tag et `up -d`.
 
 Mises à jour d'infrastructure (Keycloak, PostgreSQL, Caddy) : lire les notes de version, sauvegarder, changer le tag
 dans `docker-compose.prod.yml`, `pull` puis `up -d`. Une montée de version majeure de PostgreSQL demande un
