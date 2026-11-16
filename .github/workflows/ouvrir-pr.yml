@@ -1,0 +1,33 @@
+# Dès qu'un agent pousse une branche claude/…, ouvre la PR vers main si elle n'existe pas encore,
+# avec le titre et la description du dernier commit, puis active la fusion automatique (si les tests sont verts).
+name: Ouvrir PR agent
+on:
+  push:
+    branches: ['claude/**']
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  ouvrir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+      - name: PR vers main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCHE: ${{ github.ref_name }}
+        run: |
+          if [ -n "$(gh pr list --head "$BRANCHE" --state open --json number -q '.[0].number')" ]; then echo "PR deja ouverte"; exit 0; fi
+          if [ "$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 1)" = "0" ]; then echo "rien de nouveau"; exit 0; fi
+          titre="$(git log -1 --format=%s)"
+          num="$(echo "$BRANCHE" | sed -n 's#^claude/issue-\([0-9]*\)-.*#\1#p')"
+          corps="$(git log origin/main..HEAD --format='- %s')"
+          [ -n "$num" ] && corps="$corps
+
+          Closes #$num"
+          gh pr create --base main --head "$BRANCHE" --title "$titre" --body "$corps
+
+          PR ouverte automatiquement pour le travail de l'agent développeur."
+          gh pr merge "$BRANCHE" --auto --squash --delete-branch || true
