@@ -101,7 +101,7 @@ test.describe('Front web face a la pile reelle', () => {
     await page.getByPlaceholder('Code de vérification').fill('CODE-INCONNU-0000');
     await page.getByRole('button', { name: 'Vérifier' }).click();
 
-    await expect(page.getByText('Code inconnu.')).toBeVisible();
+    await expect(page.getByText('Code inconnu : aucune ordonnance ne correspond à ce code.')).toBeVisible();
     await expect(page.getByText('Ordonnance authentique')).toHaveCount(0);
   });
 
@@ -122,18 +122,17 @@ test.describe('Front web face a la pile reelle', () => {
     await page.getByRole('button', { name: 'Vérifier' }).click();
 
     await expect(page.getByText(/Ordonnance authentique, émise le/)).toBeVisible();
-    await expect(page.getByText('Code inconnu.')).toHaveCount(0);
+    await expect(page.getByText('Code inconnu : aucune ordonnance ne correspond à ce code.')).toHaveCount(0);
   });
 
-  test('en pre-lancement, une page privee mene le visiteur a la page « Lancement prochainement »', async ({ page }) => {
-    // tabibi-web (lancement.ts, PRELANCEMENT) : connexion et inscription fermees au public jusqu'au lancement.
-    // La fiche privee /medecins/{id} est gardee (connecteGuard) : le visiteur non connecte part vers la connexion,
-    // qui mene a /bientot tant que le site n'est pas lance.
+  test('en phase de test, une page privee mene le visiteur non connecte a la connexion Keycloak', async ({ page }) => {
+    // tabibi-web (lancement.ts, CONNEXION_OUVERTE) : depuis le 18/11/2026 la connexion est ouverte (l'inscription
+    // libre reste fermee). La fiche privee /medecins/{id} est gardee (connecteGuard) : le visiteur non connecte
+    // part vers Keycloak.
     const [premier] = await praticiens();
     expect(premier, "l'annuaire de l'API reelle est vide : aucune fiche privee a ouvrir").toBeTruthy();
     await page.goto(`/medecins/${premier.id}`);
-    await page.waitForURL((url) => url.pathname === '/bientot', { timeout: 20_000 });
-    await expect(page.getByRole('heading', { level: 1, name: 'Lancement prochainement' })).toBeVisible();
+    await page.waitForURL((url) => url.href.startsWith(`${ISSUER_KEYCLOAK}/`), { timeout: 20_000 });
   });
 
   test("robots.txt et sitemap.xml repondent, et le plan du site liste le premier praticien de l'API", async ({ request }) => {
@@ -182,7 +181,7 @@ test.describe('Front web face a la pile reelle', () => {
     await page.waitForURL((url) => url.pathname === '/ar');
     await expect(page.locator('html')).toHaveAttribute('lang', 'ar');
     await expect(page.locator('main[dir="rtl"]')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1, name: 'احجز موعدك مع طبيب في الجزائر' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'صحتك لا تحتمل الانتظار.' })).toBeVisible();
   });
 
 });
